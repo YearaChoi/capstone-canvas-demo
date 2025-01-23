@@ -1,6 +1,14 @@
 import React, { useRef, useEffect, useState } from "react";
 import styled from "styled-components";
-import bgImg from "./assets/img/bgImg.png";
+import bgImg from "./assets/img/bgImg3.png";
+import { Button, ButtonGroup, Slider } from "@mui/material";
+import SvgIcon from "@mui/material/SvgIcon";
+import AddIcon from "@mui/icons-material/Add";
+import HorizontalRuleIcon from "@mui/icons-material/HorizontalRule";
+import ZoomOutMapIcon from "@mui/icons-material/ZoomOutMap";
+import UndoIcon from "@mui/icons-material/Undo";
+import RedoIcon from "@mui/icons-material/Redo";
+import ListIcon from "@mui/icons-material/List";
 
 const CanvasDemo: React.FC = () => {
   // Canvas의 참조를 저장하는 ref
@@ -13,7 +21,8 @@ const CanvasDemo: React.FC = () => {
       y: 100,
       width: 100,
       height: 50,
-      color: `hsl(${i * 60}, 70%, 50%)`,
+      // color: `hsl(${i * 60}, 70%, 50%)`,
+      color: "yellow",
     }))
   );
 
@@ -25,6 +34,12 @@ const CanvasDemo: React.FC = () => {
   const dragOffset = useRef<{ dx: number; dy: number } | null>(null);
   // 드래그 중인 사각형의 인덱스 저장 ref
   const draggingRectIndex = useRef<number | null>(null);
+  const history = useRef<
+    { rects: (typeof rects.current)[]; selectedRects: number[] }[]
+  >([]);
+  const redoStack = useRef<
+    { rects: (typeof rects.current)[]; selectedRects: number[] }[]
+  >([]);
 
   const imageUrl = bgImg;
   // 배경 이미지 객체를 저장하는 ref
@@ -102,7 +117,7 @@ const CanvasDemo: React.FC = () => {
       ctx.fillRect(scaledX, scaledY, scaledWidth, scaledHeight);
 
       if (selectedRects.includes(index)) {
-        ctx.strokeStyle = "black";
+        ctx.strokeStyle = "aqua";
         ctx.lineWidth = 3;
         ctx.strokeRect(scaledX, scaledY, scaledWidth, scaledHeight);
       }
@@ -144,50 +159,6 @@ const CanvasDemo: React.FC = () => {
     setSelectedRects([]);
     canvas.style.cursor = "grab";
   };
-
-  // 일반 드래깅
-  // const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
-  //   if (!isDragging.current || draggingRectIndex.current === null) return;
-
-  //   const canvas = canvasRef.current;
-  //   if (!canvas) return;
-
-  //   const rect = canvas.getBoundingClientRect();
-  //   const moveX = e.clientX - rect.left;
-  //   const moveY = e.clientY - rect.top;
-
-  //   const index = draggingRectIndex.current;
-  //   if (dragOffset.current) {
-  //     const dx = dragOffset.current.dx;
-  //     const dy = dragOffset.current.dy;
-
-  //     // Calculate new position
-  //     let newX = moveX - dx;
-  //     let newY = moveY - dy;
-
-  //     // Ensure the rectangle stays within the canvas boundaries
-  //     const canvasWidth = canvas.width;
-  //     const canvasHeight = canvas.height;
-
-  //     // Keep the rectangle within the canvas bounds horizontally
-  //     newX = Math.max(
-  //       0,
-  //       Math.min(newX, canvasWidth - rects.current[index].width)
-  //     );
-
-  //     // Keep the rectangle within the canvas bounds vertically
-  //     newY = Math.max(
-  //       0,
-  //       Math.min(newY, canvasHeight - rects.current[index].height)
-  //     );
-
-  //     // Apply the calculated position
-  //     rects.current[index].x = newX;
-  //     rects.current[index].y = newY;
-
-  //     draw();
-  //   }
-  // };
 
   // 스냅핑 기능 적용
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -237,12 +208,51 @@ const CanvasDemo: React.FC = () => {
     }
   };
 
+  const saveHistory = () => {
+    history.current.push({
+      rects: JSON.parse(JSON.stringify(rects.current)),
+      selectedRects: [...selectedRects],
+    });
+    redoStack.current = []; // 새로운 변경 사항이 생기면 redo 스택 초기화
+  };
+
+  const undo = () => {
+    if (history.current.length > 0) {
+      redoStack.current.push({
+        rects: JSON.parse(JSON.stringify(rects.current)),
+        selectedRects: [...selectedRects],
+      });
+      const previousState = history.current.pop();
+      if (previousState) {
+        rects.current = JSON.parse(JSON.stringify(previousState.rects));
+        setSelectedRects([...previousState.selectedRects]);
+        draw();
+      }
+    }
+  };
+
+  const redo = () => {
+    if (redoStack.current.length > 0) {
+      history.current.push({
+        rects: JSON.parse(JSON.stringify(rects.current)),
+        selectedRects: [...selectedRects],
+      });
+      const nextState = redoStack.current.pop();
+      if (nextState) {
+        rects.current = JSON.parse(JSON.stringify(nextState.rects));
+        setSelectedRects([...nextState.selectedRects]);
+        draw();
+      }
+    }
+  };
+
   const handleMouseUp = () => {
     isDragging.current = false; // 드래깅 상태를 종료.
     draggingRectIndex.current = null; // 드래그 중인 사각형의 인덱스를 초기화.
     dragStart.current = null; // 드래그 시작 좌표를 초기화.
     dragOffset.current = null; // 드래그 오프셋을 초기화.
 
+    saveHistory(); // Save history after drag
     const canvas = canvasRef.current;
     if (canvas) {
       canvas.style.cursor = "grab"; // 마우스 업 시 손 모양 복원
@@ -363,11 +373,51 @@ const CanvasDemo: React.FC = () => {
   return (
     <Wrapper>
       <div>
-        <h1>Canvas Position Demo</h1>
+        <OrderWrapper>
+          <div>
+            <ButtonGroup variant="contained" aria-label="Basic button group">
+              <Button>
+                <SvgIcon component={ListIcon} inheritViewBox />
+              </Button>
+              <Button onClick={increaseScale}>
+                {" "}
+                <SvgIcon component={AddIcon} inheritViewBox />
+              </Button>
+              <Button onClick={decreaseScale}>
+                <SvgIcon component={HorizontalRuleIcon} inheritViewBox />
+              </Button>
+              <Button onClick={resetScale}>
+                <SvgIcon component={ZoomOutMapIcon} inheritViewBox />
+              </Button>
+            </ButtonGroup>
+            <ButtonGroup
+              variant="outlined"
+              aria-label="Basic button group"
+              sx={{ marginLeft: "10px" }}
+            >
+              <Button onClick={undo}>
+                <SvgIcon component={UndoIcon} inheritViewBox />
+              </Button>
+              <Button onClick={redo}>
+                <SvgIcon component={RedoIcon} inheritViewBox />
+              </Button>
+            </ButtonGroup>
+          </div>
+          <div>
+            <ButtonGroup variant="outlined" aria-label="Basic button group">
+              <Button onClick={alignLeft}>좌측 정렬</Button>
+              <Button onClick={alignCenter}>중앙 정렬</Button>
+              <Button onClick={alignRight}>우측 정렬</Button>
+              <Button onClick={alignTop}>상단 정렬</Button>
+              <Button onClick={alignMiddle}>중앙 정렬</Button>
+              <Button onClick={alignBottom}>하단 정렬</Button>
+            </ButtonGroup>
+          </div>
+        </OrderWrapper>
         <canvas
           ref={canvasRef}
-          width={1200}
-          height={600}
+          width={1300}
+          height={700}
           style={{ border: "1px solid black" }}
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}
@@ -375,25 +425,6 @@ const CanvasDemo: React.FC = () => {
           onWheel={handleWheel}
           onClick={handleCanvasClick}
         />
-        <OrderWrapper>
-          <div>
-            <button onClick={decreaseScale}>-</button>
-            <button onClick={resetScale}>[]</button>
-            <button onClick={increaseScale}>+</button>
-          </div>
-          <div>
-            <span>가로</span>
-            <button onClick={alignLeft}>좌측 정렬</button>
-            <button onClick={alignCenter}>중앙 정렬</button>
-            <button onClick={alignRight}>우측 정렬</button>
-            <div></div>
-
-            <span>세로</span>
-            <button onClick={alignTop}>상단 정렬</button>
-            <button onClick={alignMiddle}>중앙 정렬</button>
-            <button onClick={alignBottom}>하단 정렬</button>
-          </div>
-        </OrderWrapper>
       </div>
     </Wrapper>
   );
@@ -404,10 +435,13 @@ export default CanvasDemo;
 const Wrapper = styled.div`
   display: flex;
   justify-content: center;
+  align-items: center;
+  /* border: 2px solid green; */
+  height: 90%; // 퍼센트..모르겠다
 `;
 
 const OrderWrapper = styled.div`
-  margin-top: 20px;
   display: flex;
-  justify-content: center;
+  justify-content: space-between;
+  margin-bottom: 5px;
 `;
