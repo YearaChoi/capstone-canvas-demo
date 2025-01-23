@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useState } from "react";
 import styled from "styled-components";
 import bgImg from "./assets/img/bgImg3.png";
-import { Button, ButtonGroup, Slider } from "@mui/material";
+import { Button, ButtonGroup } from "@mui/material";
 import SvgIcon from "@mui/material/SvgIcon";
 import AddIcon from "@mui/icons-material/Add";
 import HorizontalRuleIcon from "@mui/icons-material/HorizontalRule";
@@ -9,6 +9,7 @@ import ZoomOutMapIcon from "@mui/icons-material/ZoomOutMap";
 import UndoIcon from "@mui/icons-material/Undo";
 import RedoIcon from "@mui/icons-material/Redo";
 import ListIcon from "@mui/icons-material/List";
+import { Box } from "@mui/material";
 
 const CanvasDemo: React.FC = () => {
   // Canvas의 참조를 저장하는 ref
@@ -20,9 +21,10 @@ const CanvasDemo: React.FC = () => {
       x: 50 + i * 120,
       y: 100,
       width: 100,
-      height: 50,
+      height: 40,
       // color: `hsl(${i * 60}, 70%, 50%)`,
-      color: "yellow",
+      // color: "skyblue",
+      color: `hsl(186, 100%, 94%)`,
     }))
   );
 
@@ -122,8 +124,10 @@ const CanvasDemo: React.FC = () => {
         ctx.strokeRect(scaledX, scaledY, scaledWidth, scaledHeight);
       }
 
+      const fontSize = 14 * scale;
+
       ctx.fillStyle = "black";
-      ctx.font = "14px Arial";
+      ctx.font = `${fontSize}px Arial`;
       ctx.fillText(`x: ${rect.x}, y: ${rect.y}`, scaledX + 5, scaledY + 15);
     });
   };
@@ -418,7 +422,7 @@ const CanvasDemo: React.FC = () => {
           ref={canvasRef}
           width={1300}
           height={700}
-          style={{ border: "1px solid black" }}
+          style={{ border: "1px solid skyblue", borderRadius: "4px" }}
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
