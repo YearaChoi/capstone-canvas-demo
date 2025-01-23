@@ -9,7 +9,6 @@ import ZoomOutMapIcon from "@mui/icons-material/ZoomOutMap";
 import UndoIcon from "@mui/icons-material/Undo";
 import RedoIcon from "@mui/icons-material/Redo";
 import ListIcon from "@mui/icons-material/List";
-import { Box } from "@mui/material";
 
 const CanvasDemo: React.FC = () => {
   // Canvas의 참조를 저장하는 ref
@@ -53,11 +52,11 @@ const CanvasDemo: React.FC = () => {
   const [scale, setScale] = useState(1); // 배경 이미지의 스케일 상태
 
   const increaseScale = () => {
-    setScale((prev) => Math.min(prev + 0.1, 1.3)); // 스케일을 증가, 최대 3배
+    setScale((prev) => Math.min(prev + 0.1, 1.5)); // 스케일을 증가
   };
 
   const decreaseScale = () => {
-    setScale((prev) => Math.min(prev - 0.1, 1)); // 스케일을 감소, 최소 3배
+    setScale((prev) => Math.max(prev - 0.1, 0.7)); // 스케일을 감소
   };
 
   const resetScale = () => {
