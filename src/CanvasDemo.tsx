@@ -9,7 +9,7 @@ const CanvasDemo: React.FC = () => {
   const [selectedRects, setSelectedRects] = useState<number[]>([]);
   const rects = useRef(
     Array.from({ length: 5 }, (_, i) => ({
-      x: 50 + i * 100,
+      x: 50 + i * 120,
       y: 100,
       width: 100,
       height: 50,
@@ -29,6 +29,19 @@ const CanvasDemo: React.FC = () => {
   const imageUrl = bgImg;
   // 배경 이미지 객체를 저장하는 ref
   const imageRef = useRef<HTMLImageElement | null>(null);
+  const [scale, setScale] = useState(1); // 배경 이미지의 스케일 상태
+
+  const increaseScale = () => {
+    setScale((prev) => Math.min(prev + 0.1, 1.3)); // 스케일을 증가, 최대 3배
+  };
+
+  const decreaseScale = () => {
+    setScale((prev) => Math.min(prev - 0.1, 1)); // 스케일을 감소, 최소 3배
+  };
+
+  const resetScale = () => {
+    setScale(1); // 스케일을 원래 비율로 초기화
+  };
 
   // 컴포넌트 마운트 시 배경 이미지 로드
   useEffect(() => {
@@ -43,7 +56,7 @@ const CanvasDemo: React.FC = () => {
   // 선택된 사각형이 변경될 때마다 캔버스 다시 그리기
   useEffect(() => {
     draw();
-  }, [selectedRects]);
+  }, [selectedRects, scale]);
 
   // 캔버스를 그리는 함수
   const draw = () => {
@@ -59,26 +72,44 @@ const CanvasDemo: React.FC = () => {
 
     // 배경 이미지 그리기
     if (imageRef.current) {
-      ctx.drawImage(imageRef.current, 0, 0, canvas.width, canvas.height);
+      const scaledWidth = canvas.width * scale;
+      const scaledHeight = canvas.height * scale;
+      const offsetX = (canvas.width - scaledWidth) / 2;
+      const offsetY = (canvas.height - scaledHeight) / 2;
+
+      ctx.drawImage(
+        imageRef.current,
+        offsetX,
+        offsetY,
+        scaledWidth,
+        scaledHeight
+      );
     }
 
     // 모든 사각형 그리기
     rects.current.forEach((rect, index) => {
-      // 사각형 색 채우기
-      ctx.fillStyle = rect.color;
-      ctx.fillRect(rect.x, rect.y, rect.width, rect.height);
+      // 사각형의 크기와 위치를 캔버스 크기와 배경 이미지 스케일에 맞게 조정
+      const scaledWidth = rect.width * scale;
+      const scaledHeight = rect.height * scale;
 
-      // 선택된 사각형 강조 표시
+      // 사각형의 기존 위치를 캔버스 크기와 배경 이미지 스케일에 맞게 조정 (배경 확대축소시 사각형들도 중앙을 기준으로 확대)
+      const scaledX =
+        rect.x * scale + (canvas.width - canvas.width * scale) / 2;
+      const scaledY =
+        rect.y * scale + (canvas.height - canvas.height * scale) / 2;
+
+      ctx.fillStyle = rect.color;
+      ctx.fillRect(scaledX, scaledY, scaledWidth, scaledHeight);
+
       if (selectedRects.includes(index)) {
         ctx.strokeStyle = "black";
         ctx.lineWidth = 3;
-        ctx.strokeRect(rect.x, rect.y, rect.width, rect.height);
+        ctx.strokeRect(scaledX, scaledY, scaledWidth, scaledHeight);
       }
 
-      // 사각형 내부에 좌표 텍스트 표시
-      ctx.fillStyle = "black"; // Text color
-      ctx.font = "14px Arial"; // Text font and size
-      ctx.fillText(`x: ${rect.x}, y: ${rect.y}`, rect.x + 5, rect.y + 15);
+      ctx.fillStyle = "black";
+      ctx.font = "14px Arial";
+      ctx.fillText(`x: ${rect.x}, y: ${rect.y}`, scaledX + 5, scaledY + 15);
     });
   };
 
@@ -104,12 +135,14 @@ const CanvasDemo: React.FC = () => {
         dragStart.current = { x: clickX, y: clickY }; // 드래그 시작 위치를 저장
         dragOffset.current = { dx: clickX - r.x, dy: clickY - r.y }; // 마우스와 사각형 간의 거리(offset)를 저장
         isDragging.current = true; // 드래그 상태를 활성화
+        canvas.style.cursor = "grabbing";
         return; // 함수 종료 (사각형을 찾았으므로)
       }
     }
 
     // 빈 공간을 클릭한 경우 선택된 사각형을 초기화
     setSelectedRects([]);
+    canvas.style.cursor = "grab";
   };
 
   // 일반 드래깅
@@ -209,6 +242,20 @@ const CanvasDemo: React.FC = () => {
     draggingRectIndex.current = null; // 드래그 중인 사각형의 인덱스를 초기화.
     dragStart.current = null; // 드래그 시작 좌표를 초기화.
     dragOffset.current = null; // 드래그 오프셋을 초기화.
+
+    const canvas = canvasRef.current;
+    if (canvas) {
+      canvas.style.cursor = "grab"; // 마우스 업 시 손 모양 복원
+    }
+  };
+
+  const handleWheel = (e: React.WheelEvent<HTMLCanvasElement>) => {
+    const delta = e.deltaY;
+    if (delta > 0) {
+      decreaseScale();
+    } else {
+      increaseScale();
+    }
   };
 
   const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -319,15 +366,21 @@ const CanvasDemo: React.FC = () => {
         <h1>Canvas Position Demo</h1>
         <canvas
           ref={canvasRef}
-          width={600}
-          height={400}
+          width={1200}
+          height={600}
           style={{ border: "1px solid black" }}
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
+          onWheel={handleWheel}
           onClick={handleCanvasClick}
         />
         <OrderWrapper>
+          <div>
+            <button onClick={decreaseScale}>-</button>
+            <button onClick={resetScale}>[]</button>
+            <button onClick={increaseScale}>+</button>
+          </div>
           <div>
             <span>가로</span>
             <button onClick={alignLeft}>좌측 정렬</button>
