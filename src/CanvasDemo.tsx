@@ -134,8 +134,31 @@ const CanvasDemo: React.FC = () => {
     });
   };
 
+  const transformCoordinates = (x: number, y: number) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return { transformedX: x, transformedY: y };
+
+    const rect = canvas.getBoundingClientRect(); // 캔버스의 크기와 위치
+    const canvasX = x - rect.left; // 캔버스 내부 좌표로 변환
+    const canvasY = y - rect.top;
+
+    // 확대/축소와 이동(panning)을 고려하여 좌표 변환
+    const transformedX =
+      (canvasX -
+        panOffset.current.x -
+        (canvas.width - canvas.width * scale) / 2) /
+      scale;
+    const transformedY =
+      (canvasY -
+        panOffset.current.y -
+        (canvas.height - canvas.height * scale) / 2) /
+      scale;
+
+    return { transformedX, transformedY };
+  };
+
   // 마우스 클릭 시 호출되는 함수
-  // 수정: 마우스 다운 핸들러 - 배경 드래그 상태 처리 추가
+  // 수정: handleMouseDown - 배경 드래그 시작 시 정확한 panStart 값 설정
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -144,18 +167,23 @@ const CanvasDemo: React.FC = () => {
     const clickX = e.clientX - rect.left;
     const clickY = e.clientY - rect.top;
 
-    // 사각형 클릭 여부를 먼저 판단
+    const { transformedX, transformedY } = transformCoordinates(
+      e.clientX,
+      e.clientY
+    );
+
+    // 사각형 클릭 여부를 판단
     for (let i = 0; i < rects.current.length; i++) {
       const r = rects.current[i];
       if (
-        clickX >= r.x &&
-        clickX <= r.x + r.width &&
-        clickY >= r.y &&
-        clickY <= r.y + r.height
+        transformedX >= r.x &&
+        transformedX <= r.x + r.width &&
+        transformedY >= r.y &&
+        transformedY <= r.y + r.height
       ) {
         draggingRectIndex.current = i;
-        dragStart.current = { x: clickX, y: clickY };
-        dragOffset.current = { dx: clickX - r.x, dy: clickY - r.y };
+        dragStart.current = { x: transformedX, y: transformedY }; // 변환된 좌표로 설정
+        dragOffset.current = { dx: transformedX - r.x, dy: transformedY - r.y };
         isDragging.current = true;
         canvas.style.cursor = "grabbing";
         return;
@@ -164,11 +192,12 @@ const CanvasDemo: React.FC = () => {
 
     // 사각형을 클릭하지 않았으면 배경 드래그 활성화
     isPanning.current = true;
-    panStart.current = { x: clickX, y: clickY }; // 배경 드래그 시작 위치 저장
+    panStart.current = { x: clickX, y: clickY }; // 클릭한 위치를 panStart로 설정 (화면 좌표)
     canvas.style.cursor = "grabbing";
   };
 
   // 수정: 마우스 무브 핸들러 - 배경 드래그 동작 추가
+  // 수정: handleMouseMove - 배경 드래그 정확도 개선
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -182,8 +211,8 @@ const CanvasDemo: React.FC = () => {
       const dx = moveX - panStart.current.x;
       const dy = moveY - panStart.current.y;
 
-      panOffset.current.x += dx; // 드래그 거리만큼 X 오프셋 변경
-      panOffset.current.y += dy; // 드래그 거리만큼 Y 오프셋 변경
+      panOffset.current.x += dx; // 드래그한 거리만큼 X 오프셋 업데이트
+      panOffset.current.y += dy; // 드래그한 거리만큼 Y 오프셋 업데이트
 
       panStart.current = { x: moveX, y: moveY }; // 현재 마우스 위치를 드래그 시작 위치로 갱신
       draw();
@@ -192,25 +221,31 @@ const CanvasDemo: React.FC = () => {
 
     // 사각형 드래그 중일 경우
     if (isDragging.current && draggingRectIndex.current !== null) {
+      const { transformedX, transformedY } = transformCoordinates(
+        e.clientX,
+        e.clientY
+      );
       const index = draggingRectIndex.current;
+
       if (dragOffset.current) {
         const dx = dragOffset.current.dx;
         const dy = dragOffset.current.dy;
 
-        let newX = moveX - dx;
-        let newY = moveY - dy;
+        let newX = transformedX - dx;
+        let newY = transformedY - dy;
 
+        // 그리드 스냅 처리
         newX = Math.round(newX / 22) * 22;
         newY = Math.round(newY / 22) * 22;
 
-        const canvasWidth = canvas.width;
-        const canvasHeight = canvas.height;
+        // 캔버스 경계 처리
+        const canvasWidth = canvas.width / scale; // 확대/축소를 고려한 실제 캔버스 너비
+        const canvasHeight = canvas.height / scale; // 확대/축소를 고려한 실제 캔버스 높이
 
         newX = Math.max(
           0,
           Math.min(newX, canvasWidth - rects.current[index].width)
         );
-
         newY = Math.max(
           0,
           Math.min(newY, canvasHeight - rects.current[index].height)
@@ -271,7 +306,7 @@ const CanvasDemo: React.FC = () => {
     // 배경 드래그 상태 종료
     if (isPanning.current) {
       isPanning.current = false;
-      panStart.current = null;
+      panStart.current = null; // 드래그 시작 위치 초기화
       return;
     }
 
@@ -294,33 +329,34 @@ const CanvasDemo: React.FC = () => {
     }
   };
 
+  // 수정: handleCanvasClick - 클릭 좌표 변환 적용
   const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (isDragging.current) return; // 드래그 중이면 클릭 이벤트 무시.
+    if (isDragging.current) return;
 
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const rect = canvas.getBoundingClientRect(); // canvas의 위치와 크기를 가져옴.
-    const clickX = e.clientX - rect.left; // 마우스 X 좌표를 canvas 좌표계로 변환.
-    const clickY = e.clientY - rect.top; // 마우스 Y 좌표를 canvas 좌표계로 변환.
+    const { transformedX, transformedY } = transformCoordinates(
+      e.clientX,
+      e.clientY
+    );
 
-    let selectedIndexes = [...selectedRects]; // 현재 선택된 사각형의 인덱스를 복사.
+    let selectedIndexes = [...selectedRects];
     rects.current.forEach((r, index) => {
       if (
-        clickX >= r.x &&
-        clickX <= r.x + r.width &&
-        clickY >= r.y &&
-        clickY <= r.y + r.height
+        transformedX >= r.x &&
+        transformedX <= r.x + r.width &&
+        transformedY >= r.y &&
+        transformedY <= r.y + r.height
       ) {
-        // 클릭된 사각형이 이미 선택되어 있다면 선택 해제.
         if (selectedIndexes.includes(index)) {
           selectedIndexes = selectedIndexes.filter((i) => i !== index);
         } else {
-          selectedIndexes.push(index); // 선택되지 않았다면 새로 선택.
+          selectedIndexes.push(index);
         }
       }
     });
-    setSelectedRects(selectedIndexes); // 선택된 사각형 상태 업데이트.
+    setSelectedRects(selectedIndexes);
   };
 
   const alignLeft = () => {
