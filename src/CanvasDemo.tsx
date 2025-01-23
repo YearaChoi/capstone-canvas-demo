@@ -42,6 +42,10 @@ const CanvasDemo: React.FC = () => {
   const redoStack = useRef<
     { rects: (typeof rects.current)[]; selectedRects: number[] }[]
   >([]);
+  // 배경 드래그 관련 상태를 관리
+  const isPanning = useRef(false); // 배경 드래그 중인지 여부
+  const panStart = useRef<{ x: number; y: number } | null>(null); // 배경 드래그 시작 좌표
+  const panOffset = useRef<{ x: number; y: number }>({ x: 0, y: 0 }); // 현재 배경 오프셋 값
 
   const imageUrl = bgImg;
   // 배경 이미지 객체를 저장하는 ref
@@ -75,24 +79,22 @@ const CanvasDemo: React.FC = () => {
     draw();
   }, [selectedRects, scale]);
 
-  // 캔버스를 그리는 함수
+  // 캔버스 드로잉 함수 - 배경 드래그 오프셋 반영
   const draw = () => {
-    const canvas = canvasRef.current; // canvas 요소의 참조를 가져옴
-    if (!canvas) return; // canvas가 없으면 함수 종료
+    const canvas = canvasRef.current;
+    if (!canvas) return;
 
-    // canvas의 2D 렌더링 컨텍스트를 가져옴. 이 컨텍스트를 사용해 그림을 그릴 수 있음.
     const ctx = canvas.getContext("2d");
-    if (!ctx) return; // 만약 2D 컨텍스트를 가져오지 못했다면(브라우저가 canvas를 지원하지 않는 경우), 함수 종료.
+    if (!ctx) return;
 
-    // 캔버스 초기화
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // 배경 이미지 그리기
+    // 배경 이미지 그리기 (오프셋 반영)
     if (imageRef.current) {
       const scaledWidth = canvas.width * scale;
       const scaledHeight = canvas.height * scale;
-      const offsetX = (canvas.width - scaledWidth) / 2;
-      const offsetY = (canvas.height - scaledHeight) / 2;
+      const offsetX = (canvas.width - scaledWidth) / 2 + panOffset.current.x; // X축 드래그 오프셋 적용
+      const offsetY = (canvas.height - scaledHeight) / 2 + panOffset.current.y; // Y축 드래그 오프셋 적용
 
       ctx.drawImage(
         imageRef.current,
@@ -103,17 +105,18 @@ const CanvasDemo: React.FC = () => {
       );
     }
 
-    // 모든 사각형 그리기
+    // 사각형 그리기
     rects.current.forEach((rect, index) => {
-      // 사각형의 크기와 위치를 캔버스 크기와 배경 이미지 스케일에 맞게 조정
       const scaledWidth = rect.width * scale;
       const scaledHeight = rect.height * scale;
-
-      // 사각형의 기존 위치를 캔버스 크기와 배경 이미지 스케일에 맞게 조정 (배경 확대축소시 사각형들도 중앙을 기준으로 확대)
       const scaledX =
-        rect.x * scale + (canvas.width - canvas.width * scale) / 2;
+        rect.x * scale +
+        (canvas.width - canvas.width * scale) / 2 +
+        panOffset.current.x; // 배경 오프셋 반영
       const scaledY =
-        rect.y * scale + (canvas.height - canvas.height * scale) / 2;
+        rect.y * scale +
+        (canvas.height - canvas.height * scale) / 2 +
+        panOffset.current.y; // 배경 오프셋 반영
 
       ctx.fillStyle = rect.color;
       ctx.fillRect(scaledX, scaledY, scaledWidth, scaledHeight);
@@ -125,7 +128,6 @@ const CanvasDemo: React.FC = () => {
       }
 
       const fontSize = 14 * scale;
-
       ctx.fillStyle = "black";
       ctx.font = `${fontSize}px Arial`;
       ctx.fillText(`x: ${rect.x}, y: ${rect.y}`, scaledX + 5, scaledY + 15);
@@ -133,82 +135,92 @@ const CanvasDemo: React.FC = () => {
   };
 
   // 마우스 클릭 시 호출되는 함수
+  // 수정: 마우스 다운 핸들러 - 배경 드래그 상태 처리 추가
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    const canvas = canvasRef.current; // canvas 요소의 참조를 가져옴
-    if (!canvas) return; // canvas가 없으면 함수 종료
-
-    const rect = canvas.getBoundingClientRect(); // canvas의 경계 정보를 가져옴
-    const clickX = e.clientX - rect.left; // 마우스 클릭의 x 좌표 (canvas 내부 좌표로 변환)
-    const clickY = e.clientY - rect.top; // 마우스 클릭의 y 좌표 (canvas 내부 좌표로 변환)
-
-    for (let i = 0; i < rects.current.length; i++) {
-      // 모든 사각형을 순회하며
-      const r = rects.current[i]; // 현재 사각형 정보를 가져옴
-      if (
-        clickX >= r.x && // 클릭한 x 좌표가 사각형의 왼쪽 경계 이상이고
-        clickX <= r.x + r.width && // 클릭한 x 좌표가 사각형의 오른쪽 경계 이하이며
-        clickY >= r.y && // 클릭한 y 좌표가 사각형의 위쪽 경계 이상이고
-        clickY <= r.y + r.height // 클릭한 y 좌표가 사각형의 아래쪽 경계 이하일 경우
-      ) {
-        draggingRectIndex.current = i; // 드래그 중인 사각형의 인덱스를 저장
-        dragStart.current = { x: clickX, y: clickY }; // 드래그 시작 위치를 저장
-        dragOffset.current = { dx: clickX - r.x, dy: clickY - r.y }; // 마우스와 사각형 간의 거리(offset)를 저장
-        isDragging.current = true; // 드래그 상태를 활성화
-        canvas.style.cursor = "grabbing";
-        return; // 함수 종료 (사각형을 찾았으므로)
-      }
-    }
-
-    // 빈 공간을 클릭한 경우 선택된 사각형을 초기화
-    setSelectedRects([]);
-    canvas.style.cursor = "grab";
-  };
-
-  // 스냅핑 기능 적용
-  const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    // 드래깅 중이 아니거나 드래그 중인 사각형이 없으면 함수 종료.
-    if (!isDragging.current || draggingRectIndex.current === null) return;
-
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const rect = canvas.getBoundingClientRect(); // canvas의 위치와 크기를 가져옴.
-    const moveX = e.clientX - rect.left; // 마우스 X 좌표를 canvas 좌표계로 변환.
-    const moveY = e.clientY - rect.top; // 마우스 Y 좌표를 canvas 좌표계로 변환.
+    const rect = canvas.getBoundingClientRect();
+    const clickX = e.clientX - rect.left;
+    const clickY = e.clientY - rect.top;
 
-    const index = draggingRectIndex.current; // 드래그 중인 사각형의 인덱스를 가져옴.
-    if (dragOffset.current) {
-      // 드래그 시작 시의 오프셋이 있는지 확인.
-      const dx = dragOffset.current.dx; // X축 드래그 오프셋.
-      const dy = dragOffset.current.dy; // Y축 드래그 오프셋.
+    // 사각형 클릭 여부를 먼저 판단
+    for (let i = 0; i < rects.current.length; i++) {
+      const r = rects.current[i];
+      if (
+        clickX >= r.x &&
+        clickX <= r.x + r.width &&
+        clickY >= r.y &&
+        clickY <= r.y + r.height
+      ) {
+        draggingRectIndex.current = i;
+        dragStart.current = { x: clickX, y: clickY };
+        dragOffset.current = { dx: clickX - r.x, dy: clickY - r.y };
+        isDragging.current = true;
+        canvas.style.cursor = "grabbing";
+        return;
+      }
+    }
 
-      // 새로운 사각형 위치 계산
-      let newX = moveX - dx;
-      let newY = moveY - dy;
+    // 사각형을 클릭하지 않았으면 배경 드래그 활성화
+    isPanning.current = true;
+    panStart.current = { x: clickX, y: clickY }; // 배경 드래그 시작 위치 저장
+    canvas.style.cursor = "grabbing";
+  };
 
-      // 위치를 22px 그리드에 맞춰 스냅핑 처리
-      newX = Math.round(newX / 22) * 22;
-      newY = Math.round(newY / 22) * 22;
+  // 수정: 마우스 무브 핸들러 - 배경 드래그 동작 추가
+  const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
 
-      // 사각형이 canvas 경계를 넘지 않도록 제한
-      const canvasWidth = canvas.width;
-      const canvasHeight = canvas.height;
+    const rect = canvas.getBoundingClientRect();
+    const moveX = e.clientX - rect.left;
+    const moveY = e.clientY - rect.top;
 
-      newX = Math.max(
-        0,
-        Math.min(newX, canvasWidth - rects.current[index].width)
-      ); // X축 경계 처리
+    // 배경 드래그 중일 경우
+    if (isPanning.current && panStart.current) {
+      const dx = moveX - panStart.current.x;
+      const dy = moveY - panStart.current.y;
 
-      newY = Math.max(
-        0,
-        Math.min(newY, canvasHeight - rects.current[index].height)
-      ); // Y축 경계 처리
+      panOffset.current.x += dx; // 드래그 거리만큼 X 오프셋 변경
+      panOffset.current.y += dy; // 드래그 거리만큼 Y 오프셋 변경
 
-      // 계산된 X,Y좌표를 사각형에 적용
-      rects.current[index].x = newX;
-      rects.current[index].y = newY;
-
+      panStart.current = { x: moveX, y: moveY }; // 현재 마우스 위치를 드래그 시작 위치로 갱신
       draw();
+      return;
+    }
+
+    // 사각형 드래그 중일 경우
+    if (isDragging.current && draggingRectIndex.current !== null) {
+      const index = draggingRectIndex.current;
+      if (dragOffset.current) {
+        const dx = dragOffset.current.dx;
+        const dy = dragOffset.current.dy;
+
+        let newX = moveX - dx;
+        let newY = moveY - dy;
+
+        newX = Math.round(newX / 22) * 22;
+        newY = Math.round(newY / 22) * 22;
+
+        const canvasWidth = canvas.width;
+        const canvasHeight = canvas.height;
+
+        newX = Math.max(
+          0,
+          Math.min(newX, canvasWidth - rects.current[index].width)
+        );
+
+        newY = Math.max(
+          0,
+          Math.min(newY, canvasHeight - rects.current[index].height)
+        );
+
+        rects.current[index].x = newX;
+        rects.current[index].y = newY;
+
+        draw();
+      }
     }
   };
 
@@ -251,15 +263,25 @@ const CanvasDemo: React.FC = () => {
   };
 
   const handleMouseUp = () => {
-    isDragging.current = false; // 드래깅 상태를 종료.
-    draggingRectIndex.current = null; // 드래그 중인 사각형의 인덱스를 초기화.
-    dragStart.current = null; // 드래그 시작 좌표를 초기화.
-    dragOffset.current = null; // 드래그 오프셋을 초기화.
-
-    saveHistory(); // Save history after drag
     const canvas = canvasRef.current;
     if (canvas) {
-      canvas.style.cursor = "grab"; // 마우스 업 시 손 모양 복원
+      canvas.style.cursor = "grab";
+    }
+
+    // 배경 드래그 상태 종료
+    if (isPanning.current) {
+      isPanning.current = false;
+      panStart.current = null;
+      return;
+    }
+
+    // 사각형 드래그 상태 종료
+    if (isDragging.current) {
+      isDragging.current = false;
+      draggingRectIndex.current = null;
+      dragStart.current = null;
+      dragOffset.current = null;
+      saveHistory();
     }
   };
 
