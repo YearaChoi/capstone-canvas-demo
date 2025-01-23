@@ -1,12 +1,19 @@
 import React from "react";
-import CanvasDemo from "./CanvasDemo.tsx";
+import CanvasDemo from "./CanvasDemo";
+import MenuAppBar from "./MenuAppBar";
+import styled from "styled-components";
 
 const App: React.FC = () => {
   return (
-    <div>
+    <Wrapper>
+      <MenuAppBar />
       <CanvasDemo />
-    </div>
+    </Wrapper>
   );
 };
 
 export default App;
+
+const Wrapper = styled.div`
+  height: 100vh;
+`;
