@@ -63,6 +63,26 @@ const CanvasDemo: React.FC = () => {
     setScale(1); // 스케일을 원래 비율로 초기화
   };
 
+  const STORAGE_KEY = "canvas_rects";
+
+  const saveToLocalStorage = () => {
+    // 값을 json으로 문자열로 변환
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(rects.current));
+  };
+
+  const loadFromLocalStorage = () => {
+    const storedData = localStorage.getItem(STORAGE_KEY);
+    if (storedData) {
+      // json 값을 원래 값으로 변환
+      rects.current = JSON.parse(storedData);
+      draw();
+    }
+  };
+
+  useEffect(() => {
+    loadFromLocalStorage();
+  }, []);
+
   // 컴포넌트 마운트 시 배경 이미지 로드
   useEffect(() => {
     const image = new Image();
@@ -316,6 +336,7 @@ const CanvasDemo: React.FC = () => {
       dragStart.current = null;
       dragOffset.current = null;
       saveHistory();
+      saveToLocalStorage();
     }
   };
 
