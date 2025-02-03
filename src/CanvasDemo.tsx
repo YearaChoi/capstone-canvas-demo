@@ -13,6 +13,12 @@ import ListIcon from "@mui/icons-material/List";
 const CanvasDemo: React.FC = () => {
   const canvasRef = useRef<fabric.Canvas | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const initialSelectionBounds = useRef<{
+    left: number;
+    top: number;
+    right: number;
+    bottom: number;
+  } | null>(null);
   const [scale, setScale] = useState(1);
   const history = useRef<fabric.Object[][]>([]);
   const redoStack = useRef<fabric.Object[][]>([]);
@@ -47,13 +53,6 @@ const CanvasDemo: React.FC = () => {
           height: 40,
           selectable: true,
         });
-        // rect.lockRotation = true;
-        // rect.lockScalingFlip = true;
-        // rect.lockScalingX = true;
-        // rect.lockScalingY = true;
-        // rect.hasControls = false;
-
-        // canvas.add(rect);
 
         const text = new fabric.Textbox(`device${i + 1}`, {
           left: rect.left + rect.width / 2,
@@ -81,7 +80,8 @@ const CanvasDemo: React.FC = () => {
         canvas.add(group);
       }
 
-      saveHistory();
+      canvas.hoverCursor = "grab";
+      canvas.moveCursor = "grabbing";
 
       canvas.on("object:moving", () => {
         snapToGrid();
@@ -105,7 +105,6 @@ const CanvasDemo: React.FC = () => {
         });
       }
     });
-
     canvas.renderAll();
   };
 
@@ -154,13 +153,17 @@ const CanvasDemo: React.FC = () => {
     canvas.zoomToPoint(center, newScale);
   };
 
-  // 1. 선택된 객체들의 bounding box 계산
   const getSelectionBounds = () => {
     const canvas = canvasRef.current;
     if (!canvas) return null;
 
     const activeObjects = canvas.getActiveObjects();
     if (activeObjects.length === 0) return null;
+
+    // 이미 계산된 초기 bounding box가 있으면 그것을 반환
+    if (initialSelectionBounds.current) {
+      return initialSelectionBounds.current;
+    }
 
     let left = Infinity;
     let top = Infinity;
@@ -179,12 +182,13 @@ const CanvasDemo: React.FC = () => {
       bottom = Math.max(bottom, objBottom);
     });
 
-    console.log("left", left);
-    console.log("top", top);
-    console.log("right", right);
-    console.log("bottom", bottom);
+    initialSelectionBounds.current = { left, top, right, bottom }; // 초기 bounding box 저장
 
     return { left, top, right, bottom };
+  };
+
+  const resetSelectionBounds = () => {
+    initialSelectionBounds.current = null; // 선택 해제시 초기화
   };
 
   const alignLeft = () => {
@@ -228,6 +232,7 @@ const CanvasDemo: React.FC = () => {
     if (!selectionBounds) return;
 
     const { right } = selectionBounds;
+
     // 선택된 객체들을 해당 영역의 우측으로 정렬
     canvas.getActiveObjects().forEach((obj) => {
       obj.set({ left: right - obj.width! });
@@ -243,6 +248,7 @@ const CanvasDemo: React.FC = () => {
     if (!selectionBounds) return;
 
     const { top } = selectionBounds;
+
     // 선택된 객체들을 해당 영역의 상단으로 정렬
     canvas.getActiveObjects().forEach((obj) => {
       obj.set({ top: top });
@@ -275,6 +281,7 @@ const CanvasDemo: React.FC = () => {
     if (!selectionBounds) return;
 
     const { bottom } = selectionBounds;
+
     // 선택된 객체들을 해당 영역의 하단으로 정렬
     canvas.getActiveObjects().forEach((obj) => {
       obj.set({ top: bottom - obj.height! });
