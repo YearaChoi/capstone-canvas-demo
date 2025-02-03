@@ -47,7 +47,38 @@ const CanvasDemo: React.FC = () => {
           height: 40,
           selectable: true,
         });
-        canvas.add(rect);
+        // rect.lockRotation = true;
+        // rect.lockScalingFlip = true;
+        // rect.lockScalingX = true;
+        // rect.lockScalingY = true;
+        // rect.hasControls = false;
+
+        // canvas.add(rect);
+
+        const text = new fabric.Textbox(`device${i + 1}`, {
+          left: rect.left + rect.width / 2,
+          top: rect.top + rect.height / 2,
+          fontSize: 14,
+          originX: "center",
+          originY: "center",
+          fill: "black",
+        });
+
+        // 텍스트와 사각형을 그룹화하여 하나의 객체처럼 다루기
+        const group = new fabric.Group([rect, text], {
+          left: rect.left,
+          top: rect.top,
+        });
+
+        group.lockRotation = true;
+        group.lockScalingFlip = true;
+        group.lockScalingX = true;
+        group.lockScalingY = true;
+        group.hasControls = false;
+        group.hoverCursor = "grab";
+        group.moveCursor = "grabbing";
+
+        canvas.add(group);
       }
 
       saveHistory();
@@ -84,42 +115,6 @@ const CanvasDemo: React.FC = () => {
     history.current.push(canvas.getObjects().map((obj) => obj.toObject()));
     redoStack.current = [];
   };
-
-  // const undo = () => {
-  //   const canvas = canvasRef.current;
-  //   if (!canvas || history.current.length === 0) return;
-
-  //   // 현재 상태를 redoStack에 저장
-  //   redoStack.current.push(canvas.getObjects().map((obj) => obj.toObject()));
-
-  //   // history에서 마지막 상태를 가져와서 canvas에 복원
-  //   const prevState = history.current.pop();
-  //   if (prevState) {
-  //     canvas.clear();
-  //     fabric.util.enlivenObjects(prevState).then(((objs) => {
-  //       objs.forEach((obj) => canvas.add(obj));
-  //       canvas.renderAll();
-  //     });)
-  //   }
-  // };
-
-  // const redo = () => {
-  //   const canvas = canvasRef.current;
-  //   if (!canvas || redoStack.current.length === 0) return;
-
-  //   // 현재 상태를 history에 저장
-  //   history.current.push(canvas.getObjects().map((obj) => obj.toObject()));
-
-  //   // redoStack에서 마지막 상태를 가져와서 canvas에 복원
-  //   const nextState = redoStack.current.pop();
-  //   if (nextState) {
-  //     canvas.clear();
-  //     fabric.util.enlivenObjects(nextState).then((objs) => {
-  //       objs.forEach((obj) => canvas.add(obj));
-  //       canvas.renderAll();
-  //     });
-  //   }
-  // };
 
   const increaseScale = () => {
     const canvas = canvasRef.current;
@@ -159,6 +154,134 @@ const CanvasDemo: React.FC = () => {
     canvas.zoomToPoint(center, newScale);
   };
 
+  // 1. 선택된 객체들의 bounding box 계산
+  const getSelectionBounds = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return null;
+
+    const activeObjects = canvas.getActiveObjects();
+    if (activeObjects.length === 0) return null;
+
+    let left = Infinity;
+    let top = Infinity;
+    let right = -Infinity;
+    let bottom = -Infinity;
+
+    activeObjects.forEach((obj) => {
+      const objLeft = obj.left!;
+      const objTop = obj.top!;
+      const objRight = objLeft + obj.width!;
+      const objBottom = objTop + obj.height!;
+
+      left = Math.min(left, objLeft);
+      top = Math.min(top, objTop);
+      right = Math.max(right, objRight);
+      bottom = Math.max(bottom, objBottom);
+    });
+
+    console.log("left", left);
+    console.log("top", top);
+    console.log("right", right);
+    console.log("bottom", bottom);
+
+    return { left, top, right, bottom };
+  };
+
+  const alignLeft = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const selectionBounds = getSelectionBounds();
+    if (!selectionBounds) return;
+
+    const { left } = selectionBounds;
+
+    // 선택된 객체들을 해당 영역의 좌측으로 정렬
+    canvas.getActiveObjects().forEach((obj) => {
+      obj.set({ left: left });
+    });
+    canvas.renderAll();
+  };
+
+  const alignCenter = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const selectionBounds = getSelectionBounds();
+    if (!selectionBounds) return;
+
+    const { left, right } = selectionBounds;
+    const centerX = (left + right) / 2;
+
+    // 선택된 객체들을 해당 영역의 중앙으로 정렬
+    canvas.getActiveObjects().forEach((obj) => {
+      obj.set({ left: centerX - obj.width! / 2 });
+    });
+    canvas.renderAll();
+  };
+
+  const alignRight = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const selectionBounds = getSelectionBounds();
+    if (!selectionBounds) return;
+
+    const { right } = selectionBounds;
+    // 선택된 객체들을 해당 영역의 우측으로 정렬
+    canvas.getActiveObjects().forEach((obj) => {
+      obj.set({ left: right - obj.width! });
+    });
+    canvas.renderAll();
+  };
+
+  const alignTop = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const selectionBounds = getSelectionBounds();
+    if (!selectionBounds) return;
+
+    const { top } = selectionBounds;
+    // 선택된 객체들을 해당 영역의 상단으로 정렬
+    canvas.getActiveObjects().forEach((obj) => {
+      obj.set({ top: top });
+    });
+    canvas.renderAll();
+  };
+
+  const alignMiddle = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const selectionBounds = getSelectionBounds();
+    if (!selectionBounds) return;
+
+    const { top, bottom } = selectionBounds;
+    const centerY = (top + bottom) / 2;
+
+    // 선택된 객체들을 해당 영역의 중앙으로 정렬
+    canvas.getActiveObjects().forEach((obj) => {
+      obj.set({ top: centerY - obj.height! / 2 });
+    });
+    canvas.renderAll();
+  };
+
+  const alignBottom = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const selectionBounds = getSelectionBounds();
+    if (!selectionBounds) return;
+
+    const { bottom } = selectionBounds;
+    // 선택된 객체들을 해당 영역의 하단으로 정렬
+    canvas.getActiveObjects().forEach((obj) => {
+      obj.set({ top: bottom - obj.height! });
+    });
+    canvas.renderAll();
+  };
+
   return (
     <Wrapper>
       <div>
@@ -178,27 +301,27 @@ const CanvasDemo: React.FC = () => {
                 <ZoomOutMapIcon />
               </Button>
             </ButtonGroup>
-            {/* <ButtonGroup
-        variant="outlined"
-        aria-label="Basic button group"
-        sx={{ marginLeft: "10px" }}
-      >
-        <Button onClick={undo}>
+            <ButtonGroup
+              variant="outlined"
+              aria-label="Basic button group"
+              sx={{ marginLeft: "10px" }}
+            >
+              {/* <Button onClick={undo}>
           <SvgIcon component={UndoIcon} inheritViewBox />
         </Button>
         <Button onClick={redo}>
           <SvgIcon component={RedoIcon} inheritViewBox />
-        </Button>
-      </ButtonGroup> */}
+        </Button> */}
+            </ButtonGroup>
           </div>
           <div>
             <ButtonGroup variant="outlined" aria-label="Basic button group">
-              {/* <Button onClick={alignLeft}>좌측 정렬</Button>
-        <Button onClick={alignCenter}>중앙 정렬</Button>
-        <Button onClick={alignRight}>우측 정렬</Button>
-        <Button onClick={alignTop}>상단 정렬</Button>
-        <Button onClick={alignMiddle}>중앙 정렬</Button>
-        <Button onClick={alignBottom}>하단 정렬</Button> */}
+              <Button onClick={alignLeft}>좌측 정렬</Button>
+              <Button onClick={alignCenter}>중앙 정렬</Button>
+              <Button onClick={alignRight}>우측 정렬</Button>
+              <Button onClick={alignTop}>상단 정렬</Button>
+              <Button onClick={alignMiddle}>중앙 정렬</Button>
+              <Button onClick={alignBottom}>하단 정렬</Button>
             </ButtonGroup>
           </div>
         </OrderWrapper>
