@@ -108,6 +108,29 @@ const CanvasDemo: React.FC = () => {
     canvas.renderAll();
   };
 
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    // 선택 변경 시 bounding box 초기화
+    const resetBoundsOnSelection = () => {
+      resetSelectionBounds();
+    };
+
+    // Fabric.js의 이벤트 리스너를 등록하는 부분
+    // Fabric 캔버스에서 선택(selection) 관련 이벤트가 발생할 때 resetBoundsOnSelection 함수를 호출
+    canvas.on("selection:created", resetBoundsOnSelection);
+    canvas.on("selection:updated", resetBoundsOnSelection);
+    canvas.on("selection:cleared", resetBoundsOnSelection);
+
+    // 이벤트 리스너를 정리(cleanup), 해제하는 부분
+    return () => {
+      canvas.off("selection:created", resetBoundsOnSelection);
+      canvas.off("selection:updated", resetBoundsOnSelection);
+      canvas.off("selection:cleared", resetBoundsOnSelection);
+    };
+  }, []);
+
   const saveHistory = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -187,8 +210,9 @@ const CanvasDemo: React.FC = () => {
     return { left, top, right, bottom };
   };
 
+  // 선택 해제시 bounding box 영역 초기화
   const resetSelectionBounds = () => {
-    initialSelectionBounds.current = null; // 선택 해제시 초기화
+    initialSelectionBounds.current = null;
   };
 
   const alignLeft = () => {
