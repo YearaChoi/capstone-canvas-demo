@@ -9,6 +9,14 @@ import ZoomOutMapIcon from "@mui/icons-material/ZoomOutMap";
 import UndoIcon from "@mui/icons-material/Undo";
 import RedoIcon from "@mui/icons-material/Redo";
 import ListIcon from "@mui/icons-material/List";
+import GridOnIcon from "@mui/icons-material/GridOn";
+import GridOffIcon from "@mui/icons-material/GridOff";
+import AlignHorizontalLeftIcon from "@mui/icons-material/AlignHorizontalLeft";
+import AlignHorizontalRightIcon from "@mui/icons-material/AlignHorizontalRight";
+import AlignVerticalBottomIcon from "@mui/icons-material/AlignVerticalBottom";
+import AlignVerticalTopIcon from "@mui/icons-material/AlignVerticalTop";
+import AlignHorizontalCenterIcon from "@mui/icons-material/AlignHorizontalCenter";
+import AlignVerticalCenterIcon from "@mui/icons-material/AlignVerticalCenter";
 
 const CanvasDemo: React.FC = () => {
   const canvasRef = useRef<fabric.Canvas | null>(null);
@@ -22,6 +30,7 @@ const CanvasDemo: React.FC = () => {
   const [scale, setScale] = useState(1);
   const history = useRef<fabric.Object[][]>([]);
   const redoStack = useRef<fabric.Object[][]>([]);
+  const [isSnapping, setIsSnapping] = useState(true);
 
   useEffect(() => {
     if (containerRef.current) {
@@ -83,15 +92,19 @@ const CanvasDemo: React.FC = () => {
       canvas.hoverCursor = "grab";
       canvas.moveCursor = "grabbing";
 
-      canvas.on("object:moving", snapToGrid);
-
       return () => {
         canvas.dispose();
       };
     }
   }, []);
 
+  const toggleSnapping = () => {
+    setIsSnapping((prev) => !prev);
+  };
+
   const snapToGrid = () => {
+    if (!isSnapping) return;
+
     const canvas = canvasRef.current;
     if (!canvas) return;
 
@@ -105,6 +118,21 @@ const CanvasDemo: React.FC = () => {
     });
     canvas.renderAll();
   };
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    if (isSnapping) {
+      canvas.on("object:moving", snapToGrid);
+    } else {
+      canvas.off("object:moving", snapToGrid);
+    }
+
+    return () => {
+      canvas.off("object:moving", snapToGrid);
+    };
+  }, [isSnapping]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -377,12 +405,27 @@ const CanvasDemo: React.FC = () => {
           </div>
           <div>
             <ButtonGroup variant="outlined" aria-label="Basic button group">
-              <Button onClick={alignLeft}>좌측 정렬</Button>
-              <Button onClick={alignCenter}>중앙 정렬</Button>
-              <Button onClick={alignRight}>우측 정렬</Button>
-              <Button onClick={alignTop}>상단 정렬</Button>
-              <Button onClick={alignMiddle}>중앙 정렬</Button>
-              <Button onClick={alignBottom}>하단 정렬</Button>
+              <Button onClick={toggleSnapping}>
+                {isSnapping ? <GridOnIcon /> : <GridOffIcon />}
+              </Button>
+              <Button onClick={alignLeft}>
+                <AlignHorizontalLeftIcon />
+              </Button>
+              <Button onClick={alignCenter}>
+                <AlignHorizontalCenterIcon />
+              </Button>
+              <Button onClick={alignRight}>
+                <AlignHorizontalRightIcon />
+              </Button>
+              <Button onClick={alignTop}>
+                <AlignVerticalTopIcon />
+              </Button>
+              <Button onClick={alignMiddle}>
+                <AlignVerticalCenterIcon />
+              </Button>
+              <Button onClick={alignBottom}>
+                <AlignVerticalBottomIcon />
+              </Button>
             </ButtonGroup>
           </div>
         </OrderWrapper>
@@ -407,6 +450,8 @@ const Wrapper = styled.div`
 const OrderWrapper = styled.div`
   display: flex;
   justify-content: space-between;
+  /* align-items: center; */
   width: 100%;
   margin-bottom: 10px;
+  /* border: 2px solid red; */
 `;
