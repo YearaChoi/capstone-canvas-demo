@@ -1,8 +1,12 @@
-import React, { useRef, useEffect, useState, ReactNode } from "react";
+/* eslint-disable import/first */
+import React, { useRef, useEffect, useState } from "react";
 import styled from "styled-components";
 import * as fabric from "fabric";
+// (window as any).fabric = fabric;
+import "fabric-history";
 import bgImg from "./assets/img/bgImg3.png";
 import { Button, ButtonGroup } from "@mui/material";
+import SvgIcon from "@mui/material/SvgIcon";
 import AddIcon from "@mui/icons-material/Add";
 import HorizontalRuleIcon from "@mui/icons-material/HorizontalRule";
 import ZoomOutMapIcon from "@mui/icons-material/ZoomOutMap";
@@ -20,8 +24,6 @@ const CanvasDemo: React.FC = () => {
     bottom: number;
   } | null>(null);
   const [scale, setScale] = useState(1);
-  const history = useRef<fabric.Object[][]>([]);
-  const redoStack = useRef<fabric.Object[][]>([]);
 
   useEffect(() => {
     if (containerRef.current) {
@@ -29,6 +31,9 @@ const CanvasDemo: React.FC = () => {
         selection: true,
         backgroundColor: "skyblue",
       });
+
+      // History 기능 활성화
+      (canvas as any).enableHistory();
 
       fabric.FabricImage.fromURL(bgImg).then((img) => {
         img.set({
@@ -41,6 +46,15 @@ const CanvasDemo: React.FC = () => {
         canvas.backgroundImage = img;
         canvas.renderAll();
       });
+
+      // 변경 사항이 생길 때마다 히스토리 저장
+      canvas.on("object:added", () => (canvas as any).trigger("history:push"));
+      canvas.on("object:modified", () =>
+        (canvas as any).trigger("history:push")
+      );
+      canvas.on("object:removed", () =>
+        (canvas as any).trigger("history:push")
+      );
 
       canvasRef.current = canvas;
 
@@ -131,12 +145,34 @@ const CanvasDemo: React.FC = () => {
     };
   }, []);
 
-  const saveHistory = () => {
-    const canvas = canvasRef.current;
+  const undo = () => {
+    const canvas = canvasRef.current as any;
     if (!canvas) return;
-    history.current.push(canvas.getObjects().map((obj) => obj.toObject()));
-    redoStack.current = [];
+    canvas.undo();
   };
+
+  const redo = () => {
+    const canvas = canvasRef.current as any;
+    if (!canvas) return;
+    canvas.redo();
+  };
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.ctrlKey || event.metaKey) {
+        if (event.key === "z") {
+          undo();
+        } else if (event.key === "y") {
+          redo();
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, []);
 
   const increaseScale = () => {
     const canvas = canvasRef.current;
@@ -369,12 +405,12 @@ const CanvasDemo: React.FC = () => {
               aria-label="Basic button group"
               sx={{ marginLeft: "10px" }}
             >
-              {/* <Button onClick={undo}>
-          <SvgIcon component={UndoIcon} inheritViewBox />
-        </Button>
-        <Button onClick={redo}>
-          <SvgIcon component={RedoIcon} inheritViewBox />
-        </Button> */}
+              <Button onClick={undo}>
+                <SvgIcon component={UndoIcon} inheritViewBox />
+              </Button>
+              <Button onClick={redo}>
+                <SvgIcon component={RedoIcon} inheritViewBox />
+              </Button>
             </ButtonGroup>
           </div>
           <div>
