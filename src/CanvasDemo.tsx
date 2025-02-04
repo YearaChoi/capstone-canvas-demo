@@ -164,8 +164,16 @@ const CanvasDemo: React.FC = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
+    // 스케일을 1로 설정
     setScale(1);
-    updateZoom(canvas, 1);
+
+    // 캔버스의 중앙 좌표 계산 (width와 height를 사용)
+    const center = new fabric.Point(canvas.width! / 2, canvas.height! / 2);
+
+    // 줌을 해제하여 1로 설정하면서 중앙으로 맞추기
+    canvas.setZoom(1); // 줌 해제
+    canvas.setViewportTransform([1, 0, 0, 1, 0, 0]); // 변형 행렬 초기화
+    canvas.zoomToPoint(center, 1); // 캔버스 중앙으로 맞추기
   };
 
   const updateZoom = (canvas: fabric.Canvas, newScale: number) => {
@@ -175,6 +183,30 @@ const CanvasDemo: React.FC = () => {
     // 새로운 스케일로 zoom을 설정
     canvas.zoomToPoint(center, newScale);
   };
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const handleWheelZoom = (event: WheelEvent) => {
+      event.preventDefault();
+
+      const delta = event.deltaY;
+      const zoomFactor = delta > 0 ? 0.9 : 1.1; // 스크롤 방향에 따라 줌 조정
+      let newScale = Math.min(Math.max(scale * zoomFactor, 0.7), 1.5); // 최소 0.7, 최대 1.5로 제한
+
+      // 줌 중심을 마우스 위치로 설정
+      const pointer = new fabric.Point(event.offsetX, event.offsetY);
+      canvas.zoomToPoint(pointer, newScale);
+      setScale(newScale);
+    };
+
+    canvas.wrapperEl?.addEventListener("wheel", handleWheelZoom);
+
+    return () => {
+      canvas.wrapperEl?.removeEventListener("wheel", handleWheelZoom);
+    };
+  }, [scale]);
 
   const getSelectionBounds = () => {
     const canvas = canvasRef.current;
