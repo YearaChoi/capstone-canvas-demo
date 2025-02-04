@@ -134,6 +134,62 @@ const CanvasDemo: React.FC = () => {
     };
   }, [isSnapping]);
 
+  // 키보드로 선택된 요소 상하좌우 이동
+  const moveSelection = (event: KeyboardEvent) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const activeObjects = canvas.getActiveObjects();
+    if (activeObjects.length === 0) return;
+
+    const moveAmount = event.shiftKey ? 20 : 2; // Shift 누르면 20px 이동, 기본은 2px
+
+    let dx = 0,
+      dy = 0;
+    if (event.key === "ArrowLeft") dx = -moveAmount;
+    if (event.key === "ArrowRight") dx = moveAmount;
+    if (event.key === "ArrowUp") dy = -moveAmount;
+    if (event.key === "ArrowDown") dy = moveAmount;
+
+    if (dx === 0 && dy === 0) return; // 이동 없으면 종료
+
+    if (activeObjects.length > 1) {
+      // 여러 개 선택 시 -> Bounding Box 기준 이동
+      activeObjects.forEach((obj) => {
+        obj.set({
+          left: obj.left! + dx,
+          top: obj.top! + dy,
+        });
+        obj.setCoords();
+      });
+
+      // 강제로 선택 다시 설정하여 bounding box UI 업데이트
+      canvas.discardActiveObject();
+      const selection = new fabric.ActiveSelection(activeObjects, { canvas });
+      canvas.setActiveObject(selection);
+    } else {
+      // 하나만 선택한 경우 개별이동
+      const obj = activeObjects[0];
+      obj.set({
+        left: obj.left! + dx,
+        top: obj.top! + dy,
+      });
+      obj.setCoords();
+    }
+
+    canvas.renderAll();
+  };
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    window.addEventListener("keydown", moveSelection);
+    return () => {
+      window.removeEventListener("keydown", moveSelection);
+    };
+  }, []);
+
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
