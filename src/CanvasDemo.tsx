@@ -83,9 +83,7 @@ const CanvasDemo: React.FC = () => {
       canvas.hoverCursor = "grab";
       canvas.moveCursor = "grabbing";
 
-      canvas.on("object:moving", () => {
-        snapToGrid();
-      });
+      canvas.on("object:moving", snapToGrid);
 
       return () => {
         canvas.dispose();
@@ -98,7 +96,7 @@ const CanvasDemo: React.FC = () => {
     if (!canvas) return;
 
     canvas.getObjects().forEach((obj) => {
-      if (obj instanceof fabric.Rect) {
+      if (obj instanceof fabric.Group) {
         obj.set({
           left: Math.round(obj.left! / 22) * 22,
           top: Math.round(obj.top! / 22) * 22,
