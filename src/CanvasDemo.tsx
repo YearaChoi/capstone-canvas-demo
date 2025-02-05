@@ -1,8 +1,9 @@
-import React, { useRef, useEffect, useState, ReactNode } from "react";
+import React, { useRef, useEffect, useState } from "react";
 import styled from "styled-components";
 import * as fabric from "fabric";
 import bgImg from "./assets/img/bgImg3.png";
 import { Button, ButtonGroup } from "@mui/material";
+import SvgIcon from "@mui/material/SvgIcon";
 import AddIcon from "@mui/icons-material/Add";
 import HorizontalRuleIcon from "@mui/icons-material/HorizontalRule";
 import ZoomOutMapIcon from "@mui/icons-material/ZoomOutMap";
@@ -18,6 +19,11 @@ import AlignVerticalTopIcon from "@mui/icons-material/AlignVerticalTop";
 import AlignHorizontalCenterIcon from "@mui/icons-material/AlignHorizontalCenter";
 import AlignVerticalCenterIcon from "@mui/icons-material/AlignVerticalCenter";
 
+interface HistoryState {
+  objects: fabric.Object[];
+  bgData: { src: string; scaleX: number; scaleY: number } | null;
+}
+
 const CanvasDemo: React.FC = () => {
   const canvasRef = useRef<fabric.Canvas | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -28,8 +34,11 @@ const CanvasDemo: React.FC = () => {
     bottom: number;
   } | null>(null);
   const [scale, setScale] = useState(1);
-  const history = useRef<fabric.Object[][]>([]);
-  const redoStack = useRef<fabric.Object[][]>([]);
+  // const history = useRef<fabric.Object[][]>([]);
+  // const redoStack = useRef<fabric.Object[][]>([]);
+  const history = useRef<HistoryState[]>([]);
+  const redoStack = useRef<HistoryState[]>([]);
+
   const [isSnapping, setIsSnapping] = useState(true);
 
   useEffect(() => {
@@ -260,8 +269,116 @@ const CanvasDemo: React.FC = () => {
   const saveHistory = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    history.current.push(canvas.getObjects().map((obj) => obj.toObject()));
-    redoStack.current = [];
+
+    const objects = canvas.getObjects().map((obj) => obj.toObject());
+
+    // 배경 이미지 저장
+    const bg = canvas.backgroundImage as fabric.Image | null;
+    const bgData = bg
+      ? {
+          src: bg.getSrc(),
+          scaleX: bg.scaleX,
+          scaleY: bg.scaleY,
+        }
+      : null;
+
+    history.current.push({ objects, bgData });
+    redoStack.current = []; // 새 작업이 추가되면 redo 초기화
+  };
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const handleObjectMoving = (event: fabric.TEvent) => {
+      if (!(event as any).target) return;
+
+      // 이동이 시작되기 직전에 객체의 기존 위치를 저장
+      saveHistory();
+    };
+
+    canvas.on("object:moving", handleObjectMoving);
+
+    return () => {
+      canvas.off("object:moving", handleObjectMoving);
+    };
+  }, []);
+
+  const undo = () => {
+    const canvas = canvasRef.current;
+    if (!canvas || history.current.length === 0) return;
+
+    // 현재 상태를 redoStack에 저장
+    redoStack.current.push({
+      objects: canvas.getObjects().map((obj) => obj.toObject()),
+      bgData: canvas.backgroundImage
+        ? {
+            src: (canvas.backgroundImage as fabric.Image).getSrc(),
+            scaleX: canvas.backgroundImage.scaleX,
+            scaleY: canvas.backgroundImage.scaleY,
+          }
+        : null, // 배경 이미지 정보 저장
+    });
+
+    const prevState = history.current.pop();
+    if (prevState) {
+      canvas.clear(); // 객체는 지우고 배경 이미지는 그대로 둠
+
+      fabric.util
+        .enlivenObjects<fabric.Object>(prevState.objects)
+        .then((objects) => {
+          objects.forEach((obj) => canvas.add(obj));
+          restoreBackgroundImage(prevState.bgData); // 배경 이미지 복원
+          canvas.renderAll();
+        });
+    }
+  };
+
+  const restoreBackgroundImage = (
+    bgData: { src: string; scaleX: number; scaleY: number } | null
+  ) => {
+    const canvas = canvasRef.current;
+    if (!canvas || !bgData) return;
+
+    fabric.FabricImage.fromURL(bgData.src).then((img) => {
+      img.set({
+        selectable: false,
+        evented: false,
+        scaleX: bgData.scaleX,
+        scaleY: bgData.scaleY,
+      });
+      canvas.backgroundImage = img; // 배경 이미지 설정
+      canvas.renderAll();
+    });
+  };
+
+  const redo = () => {
+    const canvas = canvasRef.current;
+    if (!canvas || redoStack.current.length === 0) return;
+
+    const nextState = redoStack.current.pop();
+    if (nextState) {
+      history.current.push({
+        objects: canvas.getObjects().map((obj) => obj.toObject()),
+        bgData: canvas.backgroundImage
+          ? {
+              src: (canvas.backgroundImage as fabric.Image).getSrc(),
+              scaleX: canvas.backgroundImage.scaleX,
+              scaleY: canvas.backgroundImage.scaleY,
+            }
+          : null, // 현재 배경 이미지 정보 저장
+      });
+
+      canvas.clear(); // 객체만 초기화하고 배경 이미지는 그대로 두기
+
+      fabric.util
+        .enlivenObjects<fabric.Object>(nextState.objects)
+        .then((objects) => {
+          objects.forEach((obj) => canvas.add(obj));
+          restoreBackgroundImage(nextState.bgData); // 배경 이미지 복원
+          canvas.renderAll();
+        });
+    }
   };
 
   const increaseScale = () => {
@@ -495,12 +612,12 @@ const CanvasDemo: React.FC = () => {
               aria-label="Basic button group"
               sx={{ marginLeft: "10px" }}
             >
-              {/* <Button onClick={undo}>
-          <SvgIcon component={UndoIcon} inheritViewBox />
-        </Button>
-        <Button onClick={redo}>
-          <SvgIcon component={RedoIcon} inheritViewBox />
-        </Button> */}
+              <Button onClick={undo}>
+                <SvgIcon component={UndoIcon} inheritViewBox />
+              </Button>
+              <Button onClick={redo}>
+                <SvgIcon component={RedoIcon} inheritViewBox />
+              </Button>
             </ButtonGroup>
           </div>
           <div>
