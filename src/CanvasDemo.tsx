@@ -29,8 +29,10 @@ const CanvasDemo: React.FC = () => {
     bottom: number;
   } | null>(null);
   const [scale, setScale] = useState(1);
-  const history = useRef<fabric.Object[][]>([]);
-  const redoStack = useRef<fabric.Object[][]>([]);
+  const [canUndo, setCanUndo] = useState(false);
+  const [canRedo, setCanRedo] = useState(false);
+  const history = useRef<string[]>([]);
+  const historyIndex = useRef<number>(-1);
   const [isSnapping, setIsSnapping] = useState(true);
 
   useEffect(() => {
@@ -50,6 +52,9 @@ const CanvasDemo: React.FC = () => {
 
         canvas.backgroundImage = img;
         canvas.renderAll();
+
+        // 초기상태 저장
+        saveState();
       });
 
       canvasRef.current = canvas;
@@ -79,10 +84,10 @@ const CanvasDemo: React.FC = () => {
           top: rect.top,
         });
 
-        group.lockRotation = true;
-        group.lockScalingFlip = true;
-        group.lockScalingX = true;
-        group.lockScalingY = true;
+        group.lockRotation = false;
+        group.lockScalingFlip = false;
+        group.lockScalingX = false;
+        group.lockScalingY = false;
         group.hasControls = false;
         group.hoverCursor = "grab";
         group.moveCursor = "grabbing";
@@ -93,11 +98,113 @@ const CanvasDemo: React.FC = () => {
       canvas.hoverCursor = "grab";
       canvas.moveCursor = "grabbing";
 
+      // mouse:up 이벤트 리스너
+      canvas.on("mouse:up", () => {
+        saveState();
+      });
+
       return () => {
         canvas.dispose();
       };
     }
   }, []);
+
+  const saveState = () => {
+    const canvas = canvasRef.current; // 현재 캔버스 요소 가져오기
+    if (!canvas) return; // 캔버스가 없으면 함수 종료
+
+    // 현재 캔버스 상태를 JSON 문자열로 변환하여 저장
+    const currentState = JSON.stringify(canvas);
+
+    // 만약 현재 위치가 히스토리의 마지막이 아니라면, 이후의 히스토리 삭제
+    if (historyIndex.current < history.current.length - 1) {
+      history.current = history.current.slice(0, historyIndex.current + 1);
+    }
+
+    // 새로운 상태를 히스토리에 추가
+    history.current.push(currentState);
+    historyIndex.current += 1; // 히스토리 인덱스 증가
+
+    // 실행 취소(Undo) 및 다시 실행(Redo) 가능 여부 업데이트
+    setCanUndo(historyIndex.current > 0);
+    setCanRedo(false); // 새로운 상태가 추가되었으므로 Redo는 불가능
+  };
+
+  // const undo = () => {
+  //   const canvas = canvasRef.current; // 현재 캔버스 요소 가져오기
+  //   if (!canvas || historyIndex.current <= 0) return; // 실행 취소할 수 없으면 종료
+
+  //   historyIndex.current -= 1; // 히스토리 인덱스 감소
+  //   const state = JSON.parse(history.current[historyIndex.current]); // 이전 상태 가져오기
+
+  //   // 캔버스를 이전 상태로 복원
+  //   canvas.loadFromJSON(state, () => {
+  //     canvas.renderAll(); // 캔버스 다시 렌더링
+
+  //     // 실행 취소 및 다시 실행 가능 여부 업데이트
+  //     setCanUndo(historyIndex.current > 0);
+  //     setCanRedo(true);
+  //   });
+  // };
+
+  // const redo = () => {
+  //   const canvas = canvasRef.current; // 현재 캔버스 요소 가져오기
+  //   if (!canvas || historyIndex.current >= history.current.length - 1) return; // Redo할 상태가 없으면 종료
+
+  //   historyIndex.current += 1; // 히스토리 인덱스 증가
+  //   const state = JSON.parse(history.current[historyIndex.current]); // 다음 상태 가져오기
+
+  //   // 캔버스를 다음 상태로 복원
+  //   canvas.loadFromJSON(state, () => {
+  //     canvas.renderAll(); // 캔버스 다시 렌더링
+
+  //     // 실행 취소 및 다시 실행 가능 여부 업데이트
+  //     setCanUndo(true);
+  //     setCanRedo(historyIndex.current < history.current.length - 1);
+  //   });
+  // };
+  const loadCanvasState = (canvas: fabric.Canvas, state: string) => {
+    return new Promise<void>((resolve) => {
+      canvas.clear(); // 기존 캔버스 내용을 먼저 지움 (흰색 깜빡임 방지)
+      canvas.loadFromJSON(state, () => {
+        canvas.renderAll(); // JSON 로드 후 강제 렌더링
+        canvas.requestRenderAll(); // 한 번 더 렌더링 요청하여 즉각 반영
+        resolve(); // 상태 로드 완료
+      });
+    });
+  };
+
+  const undo = async () => {
+    const canvas = canvasRef.current;
+    if (!canvas || historyIndex.current <= 0) return;
+
+    historyIndex.current -= 1;
+    const state = history.current[historyIndex.current];
+
+    await loadCanvasState(canvas, state); // JSON 로드 후 강제 렌더링
+    setCanUndo(historyIndex.current > 0);
+    setCanRedo(true);
+  };
+
+  const redo = async () => {
+    const canvas = canvasRef.current;
+    if (!canvas || historyIndex.current >= history.current.length - 1) return;
+
+    historyIndex.current += 1;
+    const state = history.current[historyIndex.current];
+
+    await loadCanvasState(canvas, state); // JSON 로드 후 강제 렌더링
+    setCanUndo(true);
+    setCanRedo(historyIndex.current < history.current.length - 1);
+  };
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    canvas.renderAll(); // 캔버스를 강제 렌더링
+    canvas.requestRenderAll(); // 한 번 더 렌더링 요청하여 즉각 반영
+  }, [canUndo, canRedo]); // canUndo 또는 canRedo가 변경될 때마다 실행
 
   // 요소가 캔버스 영역  안에서만 이동되도록 제한
   useEffect(() => {
@@ -257,13 +364,6 @@ const CanvasDemo: React.FC = () => {
       canvas.off("selection:cleared", resetBoundsOnSelection);
     };
   }, []);
-
-  const saveHistory = () => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    history.current.push(canvas.getObjects().map((obj) => obj.toObject()));
-    redoStack.current = [];
-  };
 
   const increaseScale = () => {
     const canvas = canvasRef.current;
@@ -496,10 +596,10 @@ const CanvasDemo: React.FC = () => {
               aria-label="Basic button group"
               sx={{ marginLeft: "10px" }}
             >
-              <Button>
+              <Button onClick={undo}>
                 <SvgIcon component={UndoIcon} inheritViewBox />
               </Button>
-              <Button>
+              <Button onClick={redo}>
                 <SvgIcon component={RedoIcon} inheritViewBox />
               </Button>
             </ButtonGroup>
@@ -545,7 +645,7 @@ const Wrapper = styled.div`
   justify-content: center;
   align-items: center;
   /* border: 2px solid green; */
-  height: 90%; // 퍼센트..모르겠다
+  height: 90%;
 `;
 
 const OrderWrapper = styled.div`
