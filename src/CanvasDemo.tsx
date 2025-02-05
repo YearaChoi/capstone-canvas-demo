@@ -80,15 +80,14 @@ const CanvasDemo: React.FC = () => {
           const group = new fabric.Group([rect, text], {
             left: rect.left,
             top: rect.top,
+            lockRotation: false,
+            lockScalingFlip: false,
+            lockScalingX: false,
+            lockScalingY: false,
+            hasControls: false,
+            hoverCursor: "grab",
+            moveCursor: "grabbing",
           });
-
-          group.lockRotation = false;
-          group.lockScalingFlip = false;
-          group.lockScalingX = false;
-          group.lockScalingY = false;
-          group.hasControls = false;
-          group.hoverCursor = "grab";
-          group.moveCursor = "grabbing";
 
           canvas.add(group);
         }
@@ -117,7 +116,19 @@ const CanvasDemo: React.FC = () => {
 
   const saveState = () => {
     const canvas = canvasRef.current;
+
     if (!canvas) return;
+
+    // https://github.com/fabricjs/fabric.js/discussions/10176
+    fabric.FabricObject.customProperties = [
+      "lockRotation",
+      "lockScalingFlip",
+      "lockScalingX",
+      "lockScalingY",
+      "hasControls",
+      "hoverCursor",
+      "moveCursor",
+    ];
 
     // (Fabric.js의 toJSON 사용)
     const currentState = JSON.stringify(canvas.toJSON());
