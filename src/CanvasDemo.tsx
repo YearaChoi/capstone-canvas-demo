@@ -98,6 +98,50 @@ const CanvasDemo: React.FC = () => {
     }
   }, []);
 
+  // 요소가 캔버스 영역  안에서만 이동되도록 제한
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const restrictMovement = (event: fabric.TEvent) => {
+      // 타입 에러를 해결하기 위해 일시적으로 target을 any로 캐스팅 (추후 정확한 타입 정의 필요)
+      const obj = (event as any).target as fabric.Group;
+      if (!obj || !(obj instanceof fabric.Group)) return;
+
+      const canvasWidth = canvas.width!;
+      const canvasHeight = canvas.height!;
+
+      // 그룹의 경계를 가져오기
+      obj.setCoords();
+      const bound = obj.getBoundingRect();
+
+      // 좌측 경계 제한
+      if (bound.left < 0) {
+        obj.set("left", 0);
+      }
+      // 우측 경계 제한
+      if (bound.left + bound.width > canvasWidth) {
+        obj.set("left", canvasWidth - bound.width);
+      }
+      // 상단 경계 제한
+      if (bound.top < 0) {
+        obj.set("top", 0);
+      }
+      // 하단 경계 제한
+      if (bound.top + bound.height > canvasHeight) {
+        obj.set("top", canvasHeight - bound.height);
+      }
+
+      obj.setCoords(); // 위치 업데이트
+    };
+
+    canvas.on("object:moving", restrictMovement);
+
+    return () => {
+      canvas.off("object:moving", restrictMovement);
+    };
+  }, []);
+
   const toggleSnapping = () => {
     setIsSnapping((prev) => !prev);
   };
