@@ -1,8 +1,9 @@
-import React, { useRef, useEffect, useState, ReactNode } from "react";
+import React, { useRef, useEffect, useState } from "react";
 import styled from "styled-components";
 import * as fabric from "fabric";
 import bgImg from "./assets/img/bgImg3.png";
 import { Button, ButtonGroup } from "@mui/material";
+import SvgIcon from "@mui/material/SvgIcon";
 import AddIcon from "@mui/icons-material/Add";
 import HorizontalRuleIcon from "@mui/icons-material/HorizontalRule";
 import ZoomOutMapIcon from "@mui/icons-material/ZoomOutMap";
@@ -495,12 +496,12 @@ const CanvasDemo: React.FC = () => {
               aria-label="Basic button group"
               sx={{ marginLeft: "10px" }}
             >
-              {/* <Button onClick={undo}>
-          <SvgIcon component={UndoIcon} inheritViewBox />
-        </Button>
-        <Button onClick={redo}>
-          <SvgIcon component={RedoIcon} inheritViewBox />
-        </Button> */}
+              <Button>
+                <SvgIcon component={UndoIcon} inheritViewBox />
+              </Button>
+              <Button>
+                <SvgIcon component={RedoIcon} inheritViewBox />
+              </Button>
             </ButtonGroup>
           </div>
           <div>
