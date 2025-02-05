@@ -1,6 +1,7 @@
 import React, { useRef, useEffect, useState } from "react";
 import styled from "styled-components";
-import * as fabric from "fabric";
+import "fabric-history";
+import fabric from "fabric/fabric-impl";
 import bgImg from "./assets/img/bgImg3.png";
 import { Button, ButtonGroup } from "@mui/material";
 import SvgIcon from "@mui/material/SvgIcon";
@@ -40,7 +41,7 @@ const CanvasDemo: React.FC = () => {
         backgroundColor: "skyblue",
       });
 
-      fabric.FabricImage.fromURL(bgImg).then((img) => {
+      fabric.FabricImage.fromURL(bgImg).then((img: any) => {
         img.set({
           selectable: false,
           evented: false,
@@ -153,7 +154,7 @@ const CanvasDemo: React.FC = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    canvas.getObjects().forEach((obj) => {
+    canvas.getObjects().forEach((obj: any) => {
       if (obj instanceof fabric.Group) {
         obj.set({
           left: Math.round(obj.left! / 22) * 22,
@@ -200,7 +201,7 @@ const CanvasDemo: React.FC = () => {
 
     if (activeObjects.length > 1) {
       // 여러 개 선택 시 -> Bounding Box 기준 이동
-      activeObjects.forEach((obj) => {
+      activeObjects.forEach((obj: any) => {
         obj.set({
           left: obj.left! + dx,
           top: obj.top! + dy,
@@ -261,7 +262,7 @@ const CanvasDemo: React.FC = () => {
   const saveHistory = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    history.current.push(canvas.getObjects().map((obj) => obj.toObject()));
+    history.current.push(canvas.getObjects().map((obj: any) => obj.toObject()));
     redoStack.current = [];
   };
 
@@ -352,7 +353,7 @@ const CanvasDemo: React.FC = () => {
     let right = -Infinity;
     let bottom = -Infinity;
 
-    activeObjects.forEach((obj) => {
+    activeObjects.forEach((obj: any) => {
       const objLeft = obj.left!;
       const objTop = obj.top!;
       const objRight = objLeft + obj.width!;
@@ -384,7 +385,7 @@ const CanvasDemo: React.FC = () => {
     const { left } = selectionBounds;
 
     // 선택된 객체들을 해당 영역의 좌측으로 정렬
-    canvas.getActiveObjects().forEach((obj) => {
+    canvas.getActiveObjects().forEach((obj: any) => {
       obj.set({ left: left });
     });
     canvas.renderAll();
@@ -401,7 +402,7 @@ const CanvasDemo: React.FC = () => {
     const centerX = (left + right) / 2;
 
     // 선택된 객체들을 해당 영역의 중앙으로 정렬
-    canvas.getActiveObjects().forEach((obj) => {
+    canvas.getActiveObjects().forEach((obj: any) => {
       obj.set({ left: centerX - obj.width! / 2 });
     });
     canvas.renderAll();
@@ -417,7 +418,7 @@ const CanvasDemo: React.FC = () => {
     const { right } = selectionBounds;
 
     // 선택된 객체들을 해당 영역의 우측으로 정렬
-    canvas.getActiveObjects().forEach((obj) => {
+    canvas.getActiveObjects().forEach((obj: any) => {
       obj.set({ left: right - obj.width! });
     });
     canvas.renderAll();
@@ -433,7 +434,7 @@ const CanvasDemo: React.FC = () => {
     const { top } = selectionBounds;
 
     // 선택된 객체들을 해당 영역의 상단으로 정렬
-    canvas.getActiveObjects().forEach((obj) => {
+    canvas.getActiveObjects().forEach((obj: any) => {
       obj.set({ top: top });
     });
     canvas.renderAll();
@@ -450,7 +451,7 @@ const CanvasDemo: React.FC = () => {
     const centerY = (top + bottom) / 2;
 
     // 선택된 객체들을 해당 영역의 중앙으로 정렬
-    canvas.getActiveObjects().forEach((obj) => {
+    canvas.getActiveObjects().forEach((obj: any) => {
       obj.set({ top: centerY - obj.height! / 2 });
     });
     canvas.renderAll();
@@ -466,7 +467,7 @@ const CanvasDemo: React.FC = () => {
     const { bottom } = selectionBounds;
 
     // 선택된 객체들을 해당 영역의 하단으로 정렬
-    canvas.getActiveObjects().forEach((obj) => {
+    canvas.getActiveObjects().forEach((obj: any) => {
       obj.set({ top: bottom - obj.height! });
     });
     canvas.renderAll();
