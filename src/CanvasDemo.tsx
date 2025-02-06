@@ -554,10 +554,40 @@ const CanvasDemo: React.FC = () => {
 
     const { left } = selectionBounds;
 
-    // 선택된 객체들을 해당 영역의 좌측으로 정렬
-    canvas.getActiveObjects().forEach((obj) => {
-      obj.set({ left: left });
+    const objects = canvas.getActiveObjects();
+    if (objects.length === 0) return;
+
+    // 객체들을 `top` 값 기준으로 그룹화
+    const groups: Record<string, fabric.Object[]> = {}; // key를 string으로 설정
+    const tolerance = 5; // 같은 줄로 인식할 `top` 차이 허용 범위
+
+    objects.forEach((obj) => {
+      const objTop = obj.top || 0;
+
+      // 기존 그룹 중, `top` 값이 비슷한 그룹 찾기
+      let groupKey = Object.keys(groups).find(
+        (key) => Math.abs(parseFloat(key) - objTop) <= tolerance
+      );
+
+      if (!groupKey) {
+        groupKey = objTop.toString(); // 새로운 그룹 생성
+        groups[groupKey] = [];
+      }
+
+      groups[groupKey]!.push(obj); // groupKey가 string임을 보장
     });
+
+    // 각 그룹별로 타일형 정렬 수행
+    Object.values(groups).forEach((group) => {
+      group.sort((a, b) => (a.left || 0) - (b.left || 0));
+
+      let currentLeft = left;
+      group.forEach((obj) => {
+        obj.set({ left: currentLeft });
+        currentLeft += obj.width || 0; // 다음 객체를 오른쪽으로 배치
+      });
+    });
+
     canvas.renderAll();
   };
 
@@ -571,10 +601,39 @@ const CanvasDemo: React.FC = () => {
     const { left, right } = selectionBounds;
     const centerX = (left + right) / 2;
 
-    // 선택된 객체들을 해당 영역의 중앙으로 정렬
-    canvas.getActiveObjects().forEach((obj) => {
-      obj.set({ left: centerX - obj.width! / 2 });
+    const objects = canvas.getActiveObjects();
+    if (objects.length === 0) return;
+
+    // 객체들을 `top` 값 기준으로 그룹화
+    const groups: Record<string, fabric.Object[]> = {};
+    const tolerance = 5;
+
+    objects.forEach((obj) => {
+      const objTop = obj.top || 0;
+      let groupKey = Object.keys(groups).find(
+        (key) => Math.abs(parseFloat(key) - objTop) <= tolerance
+      );
+
+      if (!groupKey) {
+        groupKey = objTop.toString();
+        groups[groupKey] = [];
+      }
+
+      groups[groupKey]!.push(obj);
     });
+
+    // 각 그룹별로 타일형 정렬 수행
+    Object.values(groups).forEach((group) => {
+      group.sort((a, b) => (a.left || 0) - (b.left || 0));
+
+      let currentLeft =
+        centerX - group.reduce((sum, obj) => sum + (obj.width || 0), 0) / 2;
+      group.forEach((obj) => {
+        obj.set({ left: currentLeft });
+        currentLeft += obj.width || 0;
+      });
+    });
+
     canvas.renderAll();
   };
 
@@ -587,10 +646,38 @@ const CanvasDemo: React.FC = () => {
 
     const { right } = selectionBounds;
 
-    // 선택된 객체들을 해당 영역의 우측으로 정렬
-    canvas.getActiveObjects().forEach((obj) => {
-      obj.set({ left: right - obj.width! });
+    const objects = canvas.getActiveObjects();
+    if (objects.length === 0) return;
+
+    // 객체들을 `top` 값 기준으로 그룹화
+    const groups: Record<string, fabric.Object[]> = {};
+    const tolerance = 5;
+
+    objects.forEach((obj) => {
+      const objTop = obj.top || 0;
+      let groupKey = Object.keys(groups).find(
+        (key) => Math.abs(parseFloat(key) - objTop) <= tolerance
+      );
+
+      if (!groupKey) {
+        groupKey = objTop.toString();
+        groups[groupKey] = [];
+      }
+
+      groups[groupKey]!.push(obj);
     });
+
+    // 각 그룹별로 타일형 정렬 수행
+    Object.values(groups).forEach((group) => {
+      group.sort((a, b) => (a.left || 0) - (b.left || 0));
+
+      let currentRight = right;
+      group.reverse().forEach((obj) => {
+        obj.set({ left: currentRight - (obj.width || 0) });
+        currentRight -= obj.width || 0;
+      });
+    });
+
     canvas.renderAll();
   };
 
@@ -603,10 +690,37 @@ const CanvasDemo: React.FC = () => {
 
     const { top } = selectionBounds;
 
-    // 선택된 객체들을 해당 영역의 상단으로 정렬
-    canvas.getActiveObjects().forEach((obj) => {
-      obj.set({ top: top });
+    const objects = canvas.getActiveObjects();
+    if (objects.length === 0) return;
+
+    // 객체들을 left 값 기준으로 그룹화 (같은 열에 있는 객체끼리)
+    const groups: Record<string, fabric.Object[]> = {};
+    const tolerance = 5; // 같은 열로 인식할 left 차이 허용 범위
+
+    objects.forEach((obj) => {
+      const objLeft = obj.left || 0;
+      let groupKey = Object.keys(groups).find(
+        (key) => Math.abs(parseFloat(key) - objLeft) <= tolerance
+      );
+      if (!groupKey) {
+        groupKey = objLeft.toString();
+        groups[groupKey] = [];
+      }
+      groups[groupKey]!.push(obj);
     });
+
+    // 각 그룹별로 타일형 정렬 (위에서 아래로)
+    Object.values(groups).forEach((group) => {
+      // top 값 기준 오름차순 정렬
+      group.sort((a, b) => (a.top || 0) - (b.top || 0));
+
+      let currentTop = top;
+      group.forEach((obj) => {
+        obj.set({ top: currentTop });
+        currentTop += obj.height || 0; // 다음 객체는 이전 객체 아래에 배치
+      });
+    });
+
     canvas.renderAll();
   };
 
@@ -620,10 +734,43 @@ const CanvasDemo: React.FC = () => {
     const { top, bottom } = selectionBounds;
     const centerY = (top + bottom) / 2;
 
-    // 선택된 객체들을 해당 영역의 중앙으로 정렬
-    canvas.getActiveObjects().forEach((obj) => {
-      obj.set({ top: centerY - obj.height! / 2 });
+    const objects = canvas.getActiveObjects();
+    if (objects.length === 0) return;
+
+    // left 좌표 기준으로 그룹화 (같은 열끼리)
+    const groups: Record<string, fabric.Object[]> = {};
+    const tolerance = 5;
+
+    objects.forEach((obj) => {
+      const objLeft = obj.left || 0;
+      let groupKey = Object.keys(groups).find(
+        (key) => Math.abs(parseFloat(key) - objLeft) <= tolerance
+      );
+      if (!groupKey) {
+        groupKey = objLeft.toString();
+        groups[groupKey] = [];
+      }
+      groups[groupKey]!.push(obj);
     });
+
+    // 각 그룹별로 타일형 중앙 정렬 수행
+    Object.values(groups).forEach((group) => {
+      group.sort((a, b) => (a.top || 0) - (b.top || 0));
+
+      // 그룹 내 전체 높이 계산
+      const totalHeight = group.reduce(
+        (sum, obj) => sum + (obj.height || 0),
+        0
+      );
+      // 그룹을 중앙에 두기 위한 시작 top 값
+      let startY = centerY - totalHeight / 2;
+
+      group.forEach((obj) => {
+        obj.set({ top: startY });
+        startY += obj.height || 0;
+      });
+    });
+
     canvas.renderAll();
   };
 
@@ -636,13 +783,41 @@ const CanvasDemo: React.FC = () => {
 
     const { bottom } = selectionBounds;
 
-    // 선택된 객체들을 해당 영역의 하단으로 정렬
-    canvas.getActiveObjects().forEach((obj) => {
-      obj.set({ top: bottom - obj.height! });
+    const objects = canvas.getActiveObjects();
+    if (objects.length === 0) return;
+
+    // left 좌표 기준 그룹화
+    const groups: Record<string, fabric.Object[]> = {};
+    const tolerance = 5;
+
+    objects.forEach((obj) => {
+      const objLeft = obj.left || 0;
+      let groupKey = Object.keys(groups).find(
+        (key) => Math.abs(parseFloat(key) - objLeft) <= tolerance
+      );
+      if (!groupKey) {
+        groupKey = objLeft.toString();
+        groups[groupKey] = [];
+      }
+      groups[groupKey]!.push(obj);
     });
+
+    // 각 그룹별로 타일형 하단 정렬 수행
+    Object.values(groups).forEach((group) => {
+      group.sort((a, b) => (a.top || 0) - (b.top || 0));
+
+      let currentBottom = bottom;
+      // 하단 정렬을 위해 그룹 내 객체 순서를 역순으로 처리
+      group.reverse().forEach((obj) => {
+        obj.set({ top: currentBottom - (obj.height || 0) });
+        currentBottom -= obj.height || 0;
+      });
+    });
+
     canvas.renderAll();
   };
 
+  // top을 기준으로 그룹간 정렬 필요.
   // 세로 균등 배치
   const distributeVertically = () => {
     const canvas = canvasRef.current;
