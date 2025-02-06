@@ -325,21 +325,19 @@ const CanvasDemo: React.FC = () => {
     setIsSnapping((prev) => !prev);
   };
 
-  const snapToGrid = () => {
+  const snapToGrid = (event: fabric.TEvent) => {
     if (!isSnapping) return;
 
-    const canvas = canvasRef.current;
-    if (!canvas) return;
+    const obj = (event as any).target; // 현재 이동 중인 객체만 가져옴
+    if (!obj || !(obj instanceof fabric.Group)) return;
 
-    canvas.getObjects().forEach((obj) => {
-      if (obj instanceof fabric.Group) {
-        obj.set({
-          left: Math.round(obj.left! / 22) * 22,
-          top: Math.round(obj.top! / 22) * 22,
-        });
-      }
+    obj.set({
+      left: Math.round(obj.left! / 22) * 22,
+      top: Math.round(obj.top! / 22) * 22,
     });
-    canvas.renderAll();
+
+    obj.setCoords(); // 위치 업데이트
+    canvasRef.current!.renderAll();
   };
 
   useEffect(() => {
@@ -789,7 +787,7 @@ const Wrapper = styled.div`
   display: flex;
   justify-content: center;
   align-items: center;
-  /* border: 2px solid green; */
+  /*border: 2px solid green;*/
   height: 90%;
 `;
 
