@@ -18,6 +18,8 @@ import AlignVerticalBottomIcon from "@mui/icons-material/AlignVerticalBottom";
 import AlignVerticalTopIcon from "@mui/icons-material/AlignVerticalTop";
 import AlignHorizontalCenterIcon from "@mui/icons-material/AlignHorizontalCenter";
 import AlignVerticalCenterIcon from "@mui/icons-material/AlignVerticalCenter";
+import SwapVerticalCircleIcon from "@mui/icons-material/SwapVerticalCircle";
+import SwapHorizontalCircleIcon from "@mui/icons-material/SwapHorizontalCircle";
 
 const CanvasDemo: React.FC = () => {
   const canvasRef = useRef<fabric.Canvas | null>(null);
@@ -643,6 +645,70 @@ const CanvasDemo: React.FC = () => {
     canvas.renderAll();
   };
 
+  // 세로 균등 배치
+  const distributeVertically = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const selectionBounds = getSelectionBounds();
+    if (!selectionBounds) return;
+
+    const activeObjects = canvas.getActiveObjects();
+    if (activeObjects.length < 2) return; // 두 개 이상 선택해야 실행됨
+
+    const { top, bottom } = selectionBounds;
+    const totalHeight = bottom - top;
+    const numGaps = activeObjects.length - 1;
+    const totalObjectsHeight = activeObjects.reduce(
+      (sum, obj) => sum + obj.height!,
+      0
+    );
+    const gap = (totalHeight - totalObjectsHeight) / numGaps; // 균등 간격 계산
+
+    // 객체들을 top에서부터 균일한 간격으로 배치
+    let currentY = top;
+    activeObjects
+      .sort((a, b) => a.top! - b.top!) // 현재 위치 기준으로 정렬
+      .forEach((obj) => {
+        obj.set({ top: currentY });
+        currentY += obj.height! + gap; // 다음 객체의 위치 계산
+      });
+
+    canvas.renderAll();
+  };
+
+  // 가로 균등 배치
+  const distributeHorizontally = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const selectionBounds = getSelectionBounds();
+    if (!selectionBounds) return;
+
+    const activeObjects = canvas.getActiveObjects();
+    if (activeObjects.length < 2) return; // 두 개 이상 선택해야 실행됨
+
+    const { left, right } = selectionBounds;
+    const totalWidth = right - left;
+    const numGaps = activeObjects.length - 1;
+    const totalObjectsWidth = activeObjects.reduce(
+      (sum, obj) => sum + obj.width!,
+      0
+    );
+    const gap = (totalWidth - totalObjectsWidth) / numGaps; // 균등 간격 계산
+
+    // 객체들을 left에서부터 균일한 간격으로 배치
+    let currentX = left;
+    activeObjects
+      .sort((a, b) => a.left! - b.left!) // 현재 위치 기준으로 정렬
+      .forEach((obj) => {
+        obj.set({ left: currentX });
+        currentX += obj.width! + gap; // 다음 객체의 위치 계산
+      });
+
+    canvas.renderAll();
+  };
+
   return (
     <Wrapper>
       <div>
@@ -677,9 +743,17 @@ const CanvasDemo: React.FC = () => {
           </div>
           <div>
             <ButtonGroup variant="outlined" aria-label="Basic button group">
-              <Button onClick={toggleSnapping}>
+              <Button onClick={distributeVertically}>
+                <SwapVerticalCircleIcon />
+              </Button>
+              <Button onClick={distributeHorizontally}>
+                <SwapHorizontalCircleIcon />
+              </Button>
+              <Button onClick={toggleSnapping} sx={{ marginRight: "10px" }}>
                 {isSnapping ? <GridOnIcon /> : <GridOffIcon />}
               </Button>
+            </ButtonGroup>
+            <ButtonGroup variant="outlined" aria-label="Basic button group">
               <Button onClick={alignLeft}>
                 <AlignHorizontalLeftIcon />
               </Button>
