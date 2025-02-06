@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState } from "react";
+import React, { useRef, useEffect, useState, useCallback } from "react";
 import styled from "styled-components";
 import * as fabric from "fabric";
 import bgImg from "./assets/img/bgImg3.png";
@@ -147,25 +147,23 @@ const CanvasDemo: React.FC = () => {
     setCanRedo(false);
   };
 
-  const loadCanvasState = (canvas: fabric.Canvas, state: string) => {
-    if (!canvas) return;
+  // useCallback을 사용하면 loadCanvasState가 항상 같은 함수 참조를 유지하므로 불필요한 재생성 방지
+  // useCallback은 인자로 전달한 콜백 함수 그 자체를 메모이제이션 하는 것
+  // 함수가 다시 필요할 때마다 함수를 새로 생성하는 것이 아닌 필요할 때마다 메모리에서 가져와서 재사용하는 것
+  const loadCanvasState = useCallback(
+    (canvas: fabric.Canvas, state: string) => {
+      if (!canvas) return;
 
-    // 함수를 잘못 사용함, 콜백함수 사용 금지!!
-    // canvas.loadFromJSON(state, () => {
-    //   canvas.renderAll(); // JSON 로드 후 즉시 렌더링
-    //   console.log("Json 로드 완료");
-    //   console.log("Json: ");
-    //   setInterval(() => updateZoom(canvas, scale), 500);
-    // });
-    canvas.loadFromJSON(state).then(() => {
-      canvas.renderAll(); // JSON 로드 후 즉시 렌더링
-      console.log("Json 로드 완료");
-      console.log("Json: ");
-      // setInterval(() => updateZoom(canvas, scale), 500);
-    });
-  };
+      canvas.loadFromJSON(state).then(() => {
+        canvas.renderAll(); // JSON 로드 후 즉시 렌더링
+        console.log("Json 로드 완료");
+        console.log("Json: ");
+      });
+    },
+    []
+  );
 
-  const undo = () => {
+  const undo = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas || historyIndex.current <= 0) return;
 
@@ -176,9 +174,11 @@ const CanvasDemo: React.FC = () => {
     loadCanvasState(canvas, state);
     setCanUndo(historyIndex.current > 0);
     setCanRedo(true);
-  };
+  }, [loadCanvasState, setCanUndo, setCanRedo]);
 
-  const redo = () => {
+  // 렌더링이 되어도 함수 참조가 유지됨.
+  // useEffect가 불필요하게 다시 실행되는 것을 방지할 수 있음.
+  const redo = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas || historyIndex.current >= history.current.length - 1) return;
 
@@ -189,9 +189,24 @@ const CanvasDemo: React.FC = () => {
     loadCanvasState(canvas, state);
     setCanUndo(true);
     setCanRedo(historyIndex.current < history.current.length - 1);
-  };
+  }, [loadCanvasState, setCanUndo, setCanRedo]); // 필요한 의존성 추가
 
-  console.log("historyIndex.current: ", historyIndex.current);
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.metaKey || event.ctrlKey) {
+        if (event.key === "z") {
+          event.preventDefault();
+          undo();
+        } else if (event.key === "y" || (event.shiftKey && event.key === "Z")) {
+          event.preventDefault();
+          redo();
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [undo, redo]); // undo, redo가 변경될 일이 없도록 useCallback 적용
 
   // 요소가 캔버스 영역  안에서만 이동되도록 제한
   useEffect(() => {
