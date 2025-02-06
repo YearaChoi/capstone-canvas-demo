@@ -304,7 +304,9 @@ const CanvasDemo: React.FC = () => {
 
       // 강제로 선택 다시 설정하여 bounding box UI 업데이트
       canvas.discardActiveObject();
-      const selection = new fabric.ActiveSelection(activeObjects, { canvas });
+      const selection = new fabric.ActiveSelection(activeObjects, {
+        canvas,
+      });
       canvas.setActiveObject(selection);
     } else {
       // 하나만 선택한 경우 개별이동
