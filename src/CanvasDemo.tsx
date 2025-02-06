@@ -80,15 +80,15 @@ const CanvasDemo: React.FC = () => {
 
           // 텍스트와 사각형을 그룹화하여 하나의 객체처럼 다루기
           const group = new fabric.Group([rect, text], {
-            left: rect.left,
-            top: rect.top,
-            lockRotation: false,
-            lockScalingFlip: false,
-            lockScalingX: false,
-            lockScalingY: false,
-            hasControls: false,
-            hoverCursor: "grab",
-            moveCursor: "grabbing",
+            // left: rect.left,
+            // top: rect.top,
+            // lockRotation: false,
+            // lockScalingFlip: false,
+            // lockScalingX: false,
+            // lockScalingY: false,
+            // hasControls: false,
+            // hoverCursor: "grab",
+            // moveCursor: "grabbing",
           });
 
           canvas.add(group);
@@ -189,15 +189,15 @@ const CanvasDemo: React.FC = () => {
     if (!canvas) return;
 
     // https://github.com/fabricjs/fabric.js/discussions/10176
-    fabric.FabricObject.customProperties = [
-      "lockRotation",
-      "lockScalingFlip",
-      "lockScalingX",
-      "lockScalingY",
-      "hasControls",
-      "hoverCursor",
-      "moveCursor",
-    ];
+    // fabric.FabricObject.customProperties = [
+    //   "lockRotation",
+    //   "lockScalingFlip",
+    //   "lockScalingX",
+    //   "lockScalingY",
+    //   "hasControls",
+    //   "hoverCursor",
+    //   "moveCursor",
+    // ];
 
     // (Fabric.js의 toJSON 사용)
     const currentState = JSON.stringify(canvas.toJSON());
@@ -388,8 +388,21 @@ const CanvasDemo: React.FC = () => {
       canvas.discardActiveObject();
       const selection = new fabric.ActiveSelection(activeObjects, {
         canvas,
+        // lockRotation: false,
+        // lockScalingFlip: false,
+        // lockScalingX: false,
+        // lockScalingY: false,
+        // hasControls: false,
+        // hoverCursor: "grab",
+        // moveCursor: "grabbing",
       });
+
       canvas.setActiveObject(selection);
+
+      // // selection:created 이벤트를 적절히 발생시켜 UI 업데이트
+      // canvas.fire("selection:created", {
+      //   selected: activeObjects, // 선택된 객체들 배열을 전달
+      // });
     } else {
       // 하나만 선택한 경우 개별이동
       const obj = activeObjects[0];
@@ -419,6 +432,9 @@ const CanvasDemo: React.FC = () => {
 
     // 선택 변경 시 bounding box 초기화
     const resetBoundsOnSelection = () => {
+      const selectedObject = canvas.getActiveObject();
+      if (selectedObject === null || selectedObject === undefined) return;
+      selectedObject.hasControls = false;
       resetSelectionBounds();
     };
 
