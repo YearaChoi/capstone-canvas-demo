@@ -114,6 +114,73 @@ const CanvasDemo: React.FC = () => {
     }
   }, []);
 
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    let isDragging = false;
+    let lastPosX = 0;
+    let lastPosY = 0;
+
+    const handleMouseDown = (opt: any) => {
+      const evt = opt.e as MouseEvent;
+      if (evt.altKey) {
+        isDragging = true;
+        canvas.selection = false; // 객체 선택 방지
+        lastPosX = evt.clientX;
+        lastPosY = evt.clientY;
+        canvas.defaultCursor = "grabbing";
+      }
+    };
+
+    const handleMouseMove = (opt: any) => {
+      if (!isDragging) return;
+      const evt = opt.e as MouseEvent;
+      const vpt = canvas.viewportTransform;
+      if (vpt) {
+        vpt[4] += evt.clientX - lastPosX;
+        vpt[5] += evt.clientY - lastPosY;
+      }
+      canvas.requestRenderAll();
+      lastPosX = evt.clientX;
+      lastPosY = evt.clientY;
+    };
+
+    const handleMouseUp = () => {
+      if (isDragging) {
+        canvas.setViewportTransform(canvas.viewportTransform);
+        isDragging = false;
+        canvas.selection = true; // 다시 선택 가능하도록
+      }
+    };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.altKey && !isDragging) {
+        canvas.defaultCursor = "grab"; // alt 누르고 있는 상태: grab
+      }
+    };
+
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (!e.altKey && !isDragging) {
+        canvas.defaultCursor = "default"; // alt 뗐을 때: default
+      }
+    };
+
+    canvas.on("mouse:down", handleMouseDown);
+    canvas.on("mouse:move", handleMouseMove);
+    canvas.on("mouse:up", handleMouseUp);
+    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("keyup", handleKeyUp);
+
+    return () => {
+      canvas.off("mouse:down", handleMouseDown);
+      canvas.off("mouse:move", handleMouseMove);
+      canvas.off("mouse:up", handleMouseUp);
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("keyup", handleKeyUp);
+    };
+  }, []);
+
   const saveState = () => {
     const canvas = canvasRef.current;
 
