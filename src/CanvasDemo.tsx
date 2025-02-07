@@ -18,8 +18,8 @@ import AlignVerticalBottomIcon from "@mui/icons-material/AlignVerticalBottom";
 import AlignVerticalTopIcon from "@mui/icons-material/AlignVerticalTop";
 import AlignHorizontalCenterIcon from "@mui/icons-material/AlignHorizontalCenter";
 import AlignVerticalCenterIcon from "@mui/icons-material/AlignVerticalCenter";
-import SwapVerticalCircleIcon from "@mui/icons-material/SwapVerticalCircle";
-import SwapHorizontalCircleIcon from "@mui/icons-material/SwapHorizontalCircle";
+import BorderHorizontalIcon from "@mui/icons-material/BorderHorizontal";
+import BorderVerticalIcon from "@mui/icons-material/BorderVertical";
 
 const CanvasDemo: React.FC = () => {
   const canvasRef = useRef<fabric.Canvas | null>(null);
@@ -932,14 +932,17 @@ const CanvasDemo: React.FC = () => {
           </div>
           <div>
             <ButtonGroup variant="outlined" aria-label="Basic button group">
-              <Button onClick={distributeVertically}>
-                <SwapVerticalCircleIcon />
-              </Button>
-              <Button onClick={distributeHorizontally}>
-                <SwapHorizontalCircleIcon />
-              </Button>
-              <Button onClick={toggleSnapping} sx={{ marginRight: "10px" }}>
+              <Button onClick={toggleSnapping}>
                 {isSnapping ? <GridOnIcon /> : <GridOffIcon />}
+              </Button>
+              <Button onClick={distributeVertically}>
+                <BorderVerticalIcon />
+              </Button>
+              <Button
+                onClick={distributeHorizontally}
+                sx={{ marginRight: "10px" }}
+              >
+                <BorderHorizontalIcon />
               </Button>
             </ButtonGroup>
             <ButtonGroup variant="outlined" aria-label="Basic button group">
