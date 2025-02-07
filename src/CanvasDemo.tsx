@@ -110,6 +110,11 @@ const CanvasDemo: React.FC = () => {
         saveState();
       });
 
+      canvas.on("object:moving", (e) => {
+        if (!e.target) return;
+        moveCanvas(e.target, canvas);
+      });
+
       return () => {
         canvas.dispose();
       };
@@ -898,15 +903,65 @@ const CanvasDemo: React.FC = () => {
     canvas.renderAll();
   };
 
+  // 요소 드래그되어 보이는 화면(뷰포트) 밖으로 나가면 뷰포트 이동
+  const SCROLL_SPEED = 10; // 이동 속도
+
+  // 요소가 현재 보이는 영역(뷰포트) 밖으로 나갔는지 체크
+  const isOutOfViewport = (fabricObj: any, canvas: any) => {
+    const zoom = canvas.getZoom();
+    const pan = canvas.viewportTransform;
+    if (!pan) return { left: false, right: false, top: false, bottom: false };
+
+    const viewportX = -pan[4]; // 현재 뷰포트의 X 좌표
+    const viewportY = -pan[5]; // 현재 뷰포트의 Y 좌표
+    const canvasWidth = canvas.getWidth() / zoom; // 줌 고려한 현재 뷰포트 너비
+    const canvasHeight = canvas.getHeight() / zoom; // 줌 고려한 현재 뷰포트 높이
+
+    const coords = fabricObj.aCoords; // 객체의 좌표 (좌상단 tl, 우하단 br)
+
+    return {
+      left: coords.tl.x < viewportX, // 왼쪽으로 벗어남
+      right: coords.br.x > viewportX + canvasWidth, // 오른쪽으로 벗어남
+      top: coords.tl.y < viewportY, // 위쪽으로 벗어남
+      bottom: coords.br.y > viewportY + canvasHeight, // 아래쪽으로 벗어남
+    };
+  };
+
+  // 뷰포트 이동 함수
+  const moveCanvas = (fabricObj: any, canvas: any) => {
+    const out = isOutOfViewport(fabricObj, canvas);
+    const zoom = canvas.getZoom();
+    const pan = canvas.viewportTransform;
+    if (!pan) return;
+
+    const distanceFactor = 1 / zoom; // 줌 배율 고려하여 이동 거리 조절
+
+    // 요소가 보이는 화면(뷰포트) 밖으로 나가면 이동
+    if (out.right) {
+      pan[4] -= SCROLL_SPEED * distanceFactor;
+    }
+    if (out.left) {
+      pan[4] += SCROLL_SPEED * distanceFactor;
+    }
+    if (out.bottom) {
+      pan[5] -= SCROLL_SPEED * distanceFactor;
+    }
+    if (out.top) {
+      pan[5] += SCROLL_SPEED * distanceFactor;
+    }
+
+    canvas.setViewportTransform(pan);
+  };
+
   return (
     <Wrapper>
       <div>
         <OrderWrapper>
           <div>
             <ButtonGroup variant="contained">
-              <Button>
+              {/* <Button>
                 <ListIcon />
-              </Button>
+              </Button> */}
               <Button onClick={increaseScale}>
                 <AddIcon />
               </Button>
