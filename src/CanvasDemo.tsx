@@ -1,5 +1,6 @@
-import React, { useRef, useEffect, useState } from "react";
+import React, { useRef, useEffect, useState, useCallback } from "react";
 import styled from "styled-components";
+import * as fabric from "fabric";
 import bgImg from "./assets/img/bgImg3.png";
 import { Button, ButtonGroup } from "@mui/material";
 import SvgIcon from "@mui/material/SvgIcon";
@@ -9,447 +10,892 @@ import ZoomOutMapIcon from "@mui/icons-material/ZoomOutMap";
 import UndoIcon from "@mui/icons-material/Undo";
 import RedoIcon from "@mui/icons-material/Redo";
 import ListIcon from "@mui/icons-material/List";
+import GridOnIcon from "@mui/icons-material/GridOn";
+import GridOffIcon from "@mui/icons-material/GridOff";
+import AlignHorizontalLeftIcon from "@mui/icons-material/AlignHorizontalLeft";
+import AlignHorizontalRightIcon from "@mui/icons-material/AlignHorizontalRight";
+import AlignVerticalBottomIcon from "@mui/icons-material/AlignVerticalBottom";
+import AlignVerticalTopIcon from "@mui/icons-material/AlignVerticalTop";
+import AlignHorizontalCenterIcon from "@mui/icons-material/AlignHorizontalCenter";
+import AlignVerticalCenterIcon from "@mui/icons-material/AlignVerticalCenter";
+import BorderHorizontalIcon from "@mui/icons-material/BorderHorizontal";
+import BorderVerticalIcon from "@mui/icons-material/BorderVertical";
 
 const CanvasDemo: React.FC = () => {
-  // Canvas의 참조를 저장하는 ref
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  // 선택된 사각형의 인덱스를 저장하는 state
-  const [selectedRects, setSelectedRects] = useState<number[]>([]);
-  const rects = useRef(
-    Array.from({ length: 5 }, (_, i) => ({
-      x: 50 + i * 120,
-      y: 100,
-      width: 100,
-      height: 40,
-      // color: `hsl(${i * 60}, 70%, 50%)`,
-      // color: "skyblue",
-      color: `hsl(186, 100%, 94%)`,
-    }))
-  );
+  const canvasRef = useRef<fabric.Canvas | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const initialSelectionBounds = useRef<{
+    left: number;
+    top: number;
+    right: number;
+    bottom: number;
+  } | null>(null);
 
-  // 드래그 상태를 관리하는 ref
-  const isDragging = useRef(false);
-  // 드래그 시작 시점의 좌표 저장 ref
-  const dragStart = useRef<{ x: number; y: number } | null>(null);
-  // 드래그 시 마우스와 사각형의 거리(offset) 저장 ref
-  const dragOffset = useRef<{ dx: number; dy: number } | null>(null);
-  // 드래그 중인 사각형의 인덱스 저장 ref
-  const draggingRectIndex = useRef<number | null>(null);
-  const history = useRef<
-    { rects: (typeof rects.current)[]; selectedRects: number[] }[]
-  >([]);
-  const redoStack = useRef<
-    { rects: (typeof rects.current)[]; selectedRects: number[] }[]
-  >([]);
-  // 배경 드래그 관련 상태를 관리
-  const isPanning = useRef(false); // 배경 드래그 중인지 여부
-  const panStart = useRef<{ x: number; y: number } | null>(null); // 배경 드래그 시작 좌표
-  const panOffset = useRef<{ x: number; y: number }>({ x: 0, y: 0 }); // 현재 배경 오프셋 값
+  //// 묶어서 커스텀 훅으로 잘 만들기
+  const [scale, setScale] = useState(1);
+  const [canUndo, setCanUndo] = useState(false);
+  const [canRedo, setCanRedo] = useState(false);
+  const history = useRef<string[]>([]);
+  const historyIndex = useRef<number>(-1);
+  ////
 
-  const imageUrl = bgImg;
-  // 배경 이미지 객체를 저장하는 ref
-  const imageRef = useRef<HTMLImageElement | null>(null);
-  const [scale, setScale] = useState(1); // 배경 이미지의 스케일 상태
-
-  const increaseScale = () => {
-    setScale((prev) => Math.min(prev + 0.1, 1.5)); // 스케일을 증가
-  };
-
-  const decreaseScale = () => {
-    setScale((prev) => Math.max(prev - 0.1, 0.7)); // 스케일을 감소
-  };
-
-  const resetScale = () => {
-    setScale(1); // 스케일을 원래 비율로 초기화
-  };
-
-  const STORAGE_KEY = "canvas_rects";
-
-  const saveToLocalStorage = () => {
-    // 값을 json으로 문자열로 변환
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(rects.current));
-  };
-
-  const loadFromLocalStorage = () => {
-    const storedData = localStorage.getItem(STORAGE_KEY);
-    if (storedData) {
-      // json 값을 원래 값으로 변환
-      rects.current = JSON.parse(storedData);
-      draw();
-    }
-  };
+  const [isSnapping, setIsSnapping] = useState(true);
 
   useEffect(() => {
-    loadFromLocalStorage();
+    if (containerRef.current) {
+      const canvas = new fabric.Canvas("fabricCanvas", {
+        selection: true,
+        backgroundColor: "skyblue",
+      });
+
+      fabric.FabricImage.fromURL(bgImg).then((img) => {
+        img.set({
+          selectable: false,
+          evented: false,
+          scaleX: canvas.width! / img.width!,
+          scaleY: canvas.height! / img.height!,
+        });
+
+        canvas.backgroundImage = img;
+
+        // 이미지 로딩이 되면 사각형 추가
+        for (let i = 0; i < 5; i++) {
+          const rect = new fabric.Rect({
+            left: 50 + i * 120,
+            top: 100,
+            fill: "hsl(186.15384615384616, 92.85714285714289%, 83.52941176470588%)",
+            width: 100,
+            height: 40,
+            selectable: true,
+          });
+
+          const text = new fabric.Textbox(`device${i + 1}`, {
+            left: rect.left + rect.width / 2,
+            top: rect.top + rect.height / 2,
+            fontSize: 14,
+            originX: "center",
+            originY: "center",
+            fill: "black",
+          });
+
+          // 텍스트와 사각형을 그룹화하여 하나의 객체처럼 다루기
+          const group = new fabric.Group([rect, text], {
+            // left: rect.left,
+            // top: rect.top,
+            // lockRotation: false,
+            // lockScalingFlip: false,
+            // lockScalingX: false,
+            // lockScalingY: false,
+            // hasControls: false,
+            // hoverCursor: "grab",
+            // moveCursor: "grabbing",
+          });
+
+          canvas.add(group);
+        }
+
+        // 최종 랜더링을 담당
+        canvas.renderAll();
+
+        // 최종 상태 저장
+        saveState();
+      });
+      canvasRef.current = canvas;
+
+      canvas.hoverCursor = "grab";
+      canvas.moveCursor = "grabbing";
+
+      // mouse:up 이벤트 리스너
+      canvas.on("mouse:up", () => {
+        saveState();
+      });
+
+      return () => {
+        canvas.dispose();
+      };
+    }
   }, []);
 
-  // 컴포넌트 마운트 시 배경 이미지 로드
   useEffect(() => {
-    const image = new Image();
-    image.src = imageUrl;
-    image.onload = () => {
-      imageRef.current = image;
-      draw(); // 이미지가 로드된 후 캔버스 다시 그리기
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    let isDragging = false;
+    let lastPosX = 0;
+    let lastPosY = 0;
+
+    const handleMouseDown = (opt: any) => {
+      const evt = opt.e as MouseEvent;
+      if (evt.altKey) {
+        isDragging = true;
+        canvas.selection = false; // 객체 선택 방지
+        lastPosX = evt.clientX;
+        lastPosY = evt.clientY;
+        canvas.defaultCursor = "grabbing";
+      }
+    };
+
+    const handleMouseMove = (opt: any) => {
+      if (!isDragging) return;
+      const evt = opt.e as MouseEvent;
+      const vpt = canvas.viewportTransform;
+      if (vpt) {
+        vpt[4] += evt.clientX - lastPosX;
+        vpt[5] += evt.clientY - lastPosY;
+      }
+      canvas.requestRenderAll();
+      lastPosX = evt.clientX;
+      lastPosY = evt.clientY;
+    };
+
+    const handleMouseUp = () => {
+      if (isDragging) {
+        canvas.setViewportTransform(canvas.viewportTransform);
+        isDragging = false;
+        canvas.selection = true; // 다시 선택 가능하도록
+      }
+    };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.altKey && !isDragging) {
+        canvas.defaultCursor = "grab"; // alt 누르고 있는 상태: grab
+      }
+    };
+
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (!e.altKey && !isDragging) {
+        canvas.defaultCursor = "default"; // alt 뗐을 때: default
+      }
+    };
+
+    canvas.on("mouse:down", handleMouseDown);
+    canvas.on("mouse:move", handleMouseMove);
+    canvas.on("mouse:up", handleMouseUp);
+    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("keyup", handleKeyUp);
+
+    return () => {
+      canvas.off("mouse:down", handleMouseDown);
+      canvas.off("mouse:move", handleMouseMove);
+      canvas.off("mouse:up", handleMouseUp);
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("keyup", handleKeyUp);
     };
   }, []);
 
-  // 선택된 사각형이 변경될 때마다 캔버스 다시 그리기
+  const saveState = () => {
+    const canvas = canvasRef.current;
+
+    if (!canvas) return;
+
+    // https://github.com/fabricjs/fabric.js/discussions/10176
+    // fabric.FabricObject.customProperties = [
+    //   "lockRotation",
+    //   "lockScalingFlip",
+    //   "lockScalingX",
+    //   "lockScalingY",
+    //   "hasControls",
+    //   "hoverCursor",
+    //   "moveCursor",
+    // ];
+
+    // (Fabric.js의 toJSON 사용)
+    const currentState = JSON.stringify(canvas.toJSON());
+
+    if (historyIndex.current < history.current.length - 1) {
+      history.current = history.current.slice(0, historyIndex.current + 1);
+    }
+
+    // 상태가 변경된 경우에만 저장
+    if (history.current[history.current.length - 1] !== currentState) {
+      history.current.push(currentState);
+      historyIndex.current += 1;
+    }
+
+    setCanUndo(historyIndex.current > 0);
+    setCanRedo(false);
+  };
+
+  // useCallback을 사용하면 loadCanvasState가 항상 같은 함수 참조를 유지하므로 불필요한 재생성 방지
+  // useCallback은 인자로 전달한 콜백 함수 그 자체를 메모이제이션 하는 것
+  // 함수가 다시 필요할 때마다 함수를 새로 생성하는 것이 아닌 필요할 때마다 메모리에서 가져와서 재사용하는 것
+  const loadCanvasState = useCallback(
+    (canvas: fabric.Canvas, state: string) => {
+      if (!canvas) return;
+
+      canvas.loadFromJSON(state).then(() => {
+        canvas.renderAll(); // JSON 로드 후 즉시 렌더링
+        console.log("Json 로드 완료");
+        console.log("Json: ");
+      });
+    },
+    []
+  );
+
+  const undo = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || historyIndex.current <= 0) return;
+
+    historyIndex.current -= 1;
+    const state = history.current[historyIndex.current];
+
+    console.log("Undo 실행! ", state);
+    loadCanvasState(canvas, state);
+    setCanUndo(historyIndex.current > 0);
+    setCanRedo(true);
+  }, [loadCanvasState, setCanUndo, setCanRedo]);
+
+  // 렌더링이 되어도 함수 참조가 유지됨.
+  // useEffect가 불필요하게 다시 실행되는 것을 방지할 수 있음.
+  const redo = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || historyIndex.current >= history.current.length - 1) return;
+
+    historyIndex.current += 1;
+    const state = history.current[historyIndex.current];
+
+    console.log("Redo 실행!");
+    loadCanvasState(canvas, state);
+    setCanUndo(true);
+    setCanRedo(historyIndex.current < history.current.length - 1);
+  }, [loadCanvasState, setCanUndo, setCanRedo]); // 필요한 의존성 추가
+
   useEffect(() => {
-    draw();
-  }, [selectedRects, scale]);
-
-  // 캔버스 드로잉 함수 - 배경 드래그 오프셋 반영
-  const draw = () => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    // 배경 이미지 그리기 (오프셋 반영)
-    if (imageRef.current) {
-      const scaledWidth = canvas.width * scale;
-      const scaledHeight = canvas.height * scale;
-      const offsetX = (canvas.width - scaledWidth) / 2 + panOffset.current.x; // X축 드래그 오프셋 적용
-      const offsetY = (canvas.height - scaledHeight) / 2 + panOffset.current.y; // Y축 드래그 오프셋 적용
-
-      ctx.drawImage(
-        imageRef.current,
-        offsetX,
-        offsetY,
-        scaledWidth,
-        scaledHeight
-      );
-    }
-
-    // 사각형 그리기
-    rects.current.forEach((rect, index) => {
-      const scaledWidth = rect.width * scale;
-      const scaledHeight = rect.height * scale;
-      const scaledX =
-        rect.x * scale +
-        (canvas.width - canvas.width * scale) / 2 +
-        panOffset.current.x; // 배경 오프셋 반영
-      const scaledY =
-        rect.y * scale +
-        (canvas.height - canvas.height * scale) / 2 +
-        panOffset.current.y; // 배경 오프셋 반영
-
-      ctx.fillStyle = rect.color;
-      ctx.fillRect(scaledX, scaledY, scaledWidth, scaledHeight);
-
-      if (selectedRects.includes(index)) {
-        ctx.strokeStyle = "aqua";
-        ctx.lineWidth = 3;
-        ctx.strokeRect(scaledX, scaledY, scaledWidth, scaledHeight);
-      }
-
-      const fontSize = 14 * scale;
-      ctx.fillStyle = "black";
-      ctx.font = `${fontSize}px Arial`;
-      ctx.fillText(`x: ${rect.x}, y: ${rect.y}`, scaledX + 5, scaledY + 15);
-    });
-  };
-
-  const transformCoordinates = (x: number, y: number) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return { transformedX: x, transformedY: y };
-
-    const rect = canvas.getBoundingClientRect(); // 캔버스의 크기와 위치
-    const canvasX = x - rect.left; // 캔버스 내부 좌표로 변환
-    const canvasY = y - rect.top;
-
-    // 확대/축소와 이동(panning)을 고려하여 좌표 변환
-    const transformedX =
-      (canvasX -
-        panOffset.current.x -
-        (canvas.width - canvas.width * scale) / 2) /
-      scale;
-    const transformedY =
-      (canvasY -
-        panOffset.current.y -
-        (canvas.height - canvas.height * scale) / 2) /
-      scale;
-
-    return { transformedX, transformedY };
-  };
-
-  // 마우스 클릭 시 호출되는 함수
-  // 수정: handleMouseDown - 배경 드래그 시작 시 정확한 panStart 값 설정
-  const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const rect = canvas.getBoundingClientRect();
-    const clickX = e.clientX - rect.left;
-    const clickY = e.clientY - rect.top;
-
-    const { transformedX, transformedY } = transformCoordinates(
-      e.clientX,
-      e.clientY
-    );
-
-    // 사각형 클릭 여부를 판단
-    for (let i = 0; i < rects.current.length; i++) {
-      const r = rects.current[i];
-      if (
-        transformedX >= r.x &&
-        transformedX <= r.x + r.width &&
-        transformedY >= r.y &&
-        transformedY <= r.y + r.height
-      ) {
-        draggingRectIndex.current = i;
-        dragStart.current = { x: transformedX, y: transformedY }; // 변환된 좌표로 설정
-        dragOffset.current = { dx: transformedX - r.x, dy: transformedY - r.y };
-        isDragging.current = true;
-        canvas.style.cursor = "grabbing";
-        return;
-      }
-    }
-
-    // 사각형을 클릭하지 않았으면 배경 드래그 활성화
-    isPanning.current = true;
-    panStart.current = { x: clickX, y: clickY }; // 클릭한 위치를 panStart로 설정 (화면 좌표)
-    canvas.style.cursor = "grabbing";
-  };
-
-  // 수정: 마우스 무브 핸들러 - 배경 드래그 동작 추가
-  // 수정: handleMouseMove - 배경 드래그 정확도 개선
-  const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const rect = canvas.getBoundingClientRect();
-    const moveX = e.clientX - rect.left;
-    const moveY = e.clientY - rect.top;
-
-    // 배경 드래그 중일 경우
-    if (isPanning.current && panStart.current) {
-      const dx = moveX - panStart.current.x;
-      const dy = moveY - panStart.current.y;
-
-      panOffset.current.x += dx; // 드래그한 거리만큼 X 오프셋 업데이트
-      panOffset.current.y += dy; // 드래그한 거리만큼 Y 오프셋 업데이트
-
-      panStart.current = { x: moveX, y: moveY }; // 현재 마우스 위치를 드래그 시작 위치로 갱신
-      draw();
-      return;
-    }
-
-    // 사각형 드래그 중일 경우
-    if (isDragging.current && draggingRectIndex.current !== null) {
-      const { transformedX, transformedY } = transformCoordinates(
-        e.clientX,
-        e.clientY
-      );
-      const index = draggingRectIndex.current;
-
-      if (dragOffset.current) {
-        const dx = dragOffset.current.dx;
-        const dy = dragOffset.current.dy;
-
-        let newX = transformedX - dx;
-        let newY = transformedY - dy;
-
-        // 그리드 스냅 처리
-        newX = Math.round(newX / 22) * 22;
-        newY = Math.round(newY / 22) * 22;
-
-        // 캔버스 경계 처리
-        const canvasWidth = canvas.width / scale; // 확대/축소를 고려한 실제 캔버스 너비
-        const canvasHeight = canvas.height / scale; // 확대/축소를 고려한 실제 캔버스 높이
-
-        newX = Math.max(
-          0,
-          Math.min(newX, canvasWidth - rects.current[index].width)
-        );
-        newY = Math.max(
-          0,
-          Math.min(newY, canvasHeight - rects.current[index].height)
-        );
-
-        rects.current[index].x = newX;
-        rects.current[index].y = newY;
-
-        draw();
-      }
-    }
-  };
-
-  const saveHistory = () => {
-    history.current.push({
-      rects: JSON.parse(JSON.stringify(rects.current)),
-      selectedRects: [...selectedRects],
-    });
-    redoStack.current = []; // 새로운 변경 사항이 생기면 redo 스택 초기화
-  };
-
-  const undo = () => {
-    if (history.current.length > 0) {
-      redoStack.current.push({
-        rects: JSON.parse(JSON.stringify(rects.current)),
-        selectedRects: [...selectedRects],
-      });
-      const previousState = history.current.pop();
-      if (previousState) {
-        rects.current = JSON.parse(JSON.stringify(previousState.rects));
-        setSelectedRects([...previousState.selectedRects]);
-        draw();
-      }
-    }
-  };
-
-  const redo = () => {
-    if (redoStack.current.length > 0) {
-      history.current.push({
-        rects: JSON.parse(JSON.stringify(rects.current)),
-        selectedRects: [...selectedRects],
-      });
-      const nextState = redoStack.current.pop();
-      if (nextState) {
-        rects.current = JSON.parse(JSON.stringify(nextState.rects));
-        setSelectedRects([...nextState.selectedRects]);
-        draw();
-      }
-    }
-  };
-
-  const handleMouseUp = () => {
-    const canvas = canvasRef.current;
-    if (canvas) {
-      canvas.style.cursor = "grab";
-    }
-
-    // 배경 드래그 상태 종료
-    if (isPanning.current) {
-      isPanning.current = false;
-      panStart.current = null; // 드래그 시작 위치 초기화
-      return;
-    }
-
-    // 사각형 드래그 상태 종료
-    if (isDragging.current) {
-      isDragging.current = false;
-      draggingRectIndex.current = null;
-      dragStart.current = null;
-      dragOffset.current = null;
-      saveHistory();
-      saveToLocalStorage();
-    }
-  };
-
-  const handleWheel = (e: React.WheelEvent<HTMLCanvasElement>) => {
-    const delta = e.deltaY;
-    if (delta > 0) {
-      decreaseScale();
-    } else {
-      increaseScale();
-    }
-  };
-
-  // 수정: handleCanvasClick - 클릭 좌표 변환 적용
-  const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (isDragging.current) return;
-
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const { transformedX, transformedY } = transformCoordinates(
-      e.clientX,
-      e.clientY
-    );
-
-    let selectedIndexes = [...selectedRects];
-    rects.current.forEach((r, index) => {
-      if (
-        transformedX >= r.x &&
-        transformedX <= r.x + r.width &&
-        transformedY >= r.y &&
-        transformedY <= r.y + r.height
-      ) {
-        if (selectedIndexes.includes(index)) {
-          selectedIndexes = selectedIndexes.filter((i) => i !== index);
-        } else {
-          selectedIndexes.push(index);
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.metaKey || event.ctrlKey) {
+        if (event.key === "z") {
+          event.preventDefault();
+          undo();
+        } else if (event.key === "y" || (event.shiftKey && event.key === "Z")) {
+          event.preventDefault();
+          redo();
         }
       }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [undo, redo]); // undo, redo가 변경될 일이 없도록 useCallback 적용
+
+  // 요소가 캔버스 영역  안에서만 이동되도록 제한
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const restrictMovement = (event: fabric.TEvent) => {
+      // 타입 에러를 해결하기 위해 일시적으로 target을 any로 캐스팅 (추후 정확한 타입 정의 필요)
+      const obj = (event as any).target as fabric.Group;
+      if (!obj || !(obj instanceof fabric.Group)) return;
+
+      const canvasWidth = canvas.width!;
+      const canvasHeight = canvas.height!;
+
+      // 그룹의 경계를 가져오기
+      obj.setCoords();
+      const bound = obj.getBoundingRect();
+
+      // 좌측 경계 제한
+      if (bound.left < 0) {
+        obj.set("left", 0);
+      }
+      // 우측 경계 제한
+      if (bound.left + bound.width > canvasWidth) {
+        obj.set("left", canvasWidth - bound.width);
+      }
+      // 상단 경계 제한
+      if (bound.top < 0) {
+        obj.set("top", 0);
+      }
+      // 하단 경계 제한
+      if (bound.top + bound.height > canvasHeight) {
+        obj.set("top", canvasHeight - bound.height);
+      }
+
+      obj.setCoords(); // 위치 업데이트
+    };
+
+    canvas.on("object:moving", restrictMovement);
+
+    return () => {
+      canvas.off("object:moving", restrictMovement);
+    };
+  }, []);
+
+  const toggleSnapping = () => {
+    setIsSnapping((prev) => !prev);
+  };
+
+  const snapToGrid = (event: fabric.TEvent) => {
+    if (!isSnapping) return;
+
+    const obj = (event as any).target; // 현재 이동 중인 객체만 가져옴
+    if (!obj || !(obj instanceof fabric.Group)) return;
+
+    obj.set({
+      left: Math.round(obj.left! / 22) * 22,
+      top: Math.round(obj.top! / 22) * 22,
     });
-    setSelectedRects(selectedIndexes);
+
+    obj.setCoords(); // 위치 업데이트
+    canvasRef.current!.renderAll();
+  };
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    if (isSnapping) {
+      canvas.on("object:moving", snapToGrid);
+    } else {
+      canvas.off("object:moving", snapToGrid);
+    }
+
+    return () => {
+      canvas.off("object:moving", snapToGrid);
+    };
+  }, [isSnapping]);
+
+  // 키보드로 선택된 요소 상하좌우 이동
+  const moveSelection = (event: KeyboardEvent) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const activeObjects = canvas.getActiveObjects();
+    if (activeObjects.length === 0) return;
+
+    const moveAmount = event.shiftKey ? 20 : 2; // Shift 누르면 20px 이동, 기본은 2px
+
+    let dx = 0,
+      dy = 0;
+    if (event.key === "ArrowLeft") dx = -moveAmount;
+    if (event.key === "ArrowRight") dx = moveAmount;
+    if (event.key === "ArrowUp") dy = -moveAmount;
+    if (event.key === "ArrowDown") dy = moveAmount;
+
+    if (dx === 0 && dy === 0) return; // 이동 없으면 종료
+
+    if (activeObjects.length > 1) {
+      // 여러 개 선택 시 -> Bounding Box 기준 이동
+      activeObjects.forEach((obj) => {
+        obj.set({
+          left: obj.left! + dx,
+          top: obj.top! + dy,
+        });
+        obj.setCoords();
+      });
+
+      // 강제로 선택 다시 설정하여 bounding box UI 업데이트
+      canvas.discardActiveObject();
+      const selection = new fabric.ActiveSelection(activeObjects, {
+        canvas,
+        // lockRotation: false,
+        // lockScalingFlip: false,
+        // lockScalingX: false,
+        // lockScalingY: false,
+        // hasControls: false,
+        // hoverCursor: "grab",
+        // moveCursor: "grabbing",
+      });
+
+      canvas.setActiveObject(selection);
+
+      // // selection:created 이벤트를 적절히 발생시켜 UI 업데이트
+      // canvas.fire("selection:created", {
+      //   selected: activeObjects, // 선택된 객체들 배열을 전달
+      // });
+    } else {
+      // 하나만 선택한 경우 개별이동
+      const obj = activeObjects[0];
+      obj.set({
+        left: obj.left! + dx,
+        top: obj.top! + dy,
+      });
+      obj.setCoords();
+    }
+
+    canvas.renderAll();
+  };
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    window.addEventListener("keydown", moveSelection);
+    return () => {
+      window.removeEventListener("keydown", moveSelection);
+    };
+  }, []);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    // 선택 변경 시 bounding box 초기화
+    const resetBoundsOnSelection = () => {
+      const selectedObject = canvas.getActiveObject();
+      if (selectedObject === null || selectedObject === undefined) return;
+      selectedObject.hasControls = false;
+      resetSelectionBounds();
+    };
+
+    // Fabric.js의 이벤트 리스너를 등록하는 부분
+    // Fabric 캔버스에서 선택(selection) 관련 이벤트가 발생할 때 resetBoundsOnSelection 함수를 호출
+    canvas.on("selection:created", resetBoundsOnSelection);
+    canvas.on("selection:updated", resetBoundsOnSelection);
+    canvas.on("selection:cleared", resetBoundsOnSelection);
+
+    // 이벤트 리스너를 정리(cleanup), 해제하는 부분
+    return () => {
+      canvas.off("selection:created", resetBoundsOnSelection);
+      canvas.off("selection:updated", resetBoundsOnSelection);
+      canvas.off("selection:cleared", resetBoundsOnSelection);
+    };
+  }, []);
+
+  const increaseScale = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    setScale((prev) => {
+      const newScale = Math.min(prev + 0.1, 1.5);
+      updateZoom(canvas, newScale);
+      return newScale;
+    });
+  };
+
+  const decreaseScale = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    setScale((prev) => {
+      const newScale = Math.max(prev - 0.1, 0.7);
+      updateZoom(canvas, newScale);
+      return newScale;
+    });
+  };
+
+  const resetScale = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    // 스케일을 1로 설정
+    setScale(1);
+
+    // 캔버스의 중앙 좌표 계산 (width와 height를 사용)
+    const center = new fabric.Point(canvas.width! / 2, canvas.height! / 2);
+
+    // 줌을 해제하여 1로 설정하면서 중앙으로 맞추기
+    canvas.setZoom(1); // 줌 해제
+    canvas.setViewportTransform([1, 0, 0, 1, 0, 0]); // 변형 행렬 초기화
+    canvas.zoomToPoint(center, 1); // 캔버스 중앙으로 맞추기
+  };
+
+  const updateZoom = (canvas: fabric.Canvas, newScale: number) => {
+    // 캔버스의 중앙 좌표 계산 (width와 height를 사용)
+    const center = new fabric.Point(canvas.width / 2, canvas.height / 2);
+
+    // 새로운 스케일로 zoom을 설정
+    canvas.zoomToPoint(center, newScale);
+  };
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const handleWheelZoom = (event: WheelEvent) => {
+      event.preventDefault();
+
+      const delta = event.deltaY;
+      const zoomFactor = delta > 0 ? 0.9 : 1.1; // 스크롤 방향에 따라 줌 조정
+      let newScale = Math.min(Math.max(scale * zoomFactor, 0.7), 1.5); // 최소 0.7, 최대 1.5로 제한
+
+      // 줌 중심을 마우스 위치로 설정
+      const pointer = new fabric.Point(event.offsetX, event.offsetY);
+      canvas.zoomToPoint(pointer, newScale);
+      setScale(newScale);
+    };
+
+    canvas.wrapperEl?.addEventListener("wheel", handleWheelZoom);
+
+    return () => {
+      canvas.wrapperEl?.removeEventListener("wheel", handleWheelZoom);
+    };
+  }, [scale]);
+
+  const getSelectionBounds = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return null;
+
+    const activeObjects = canvas.getActiveObjects();
+    if (activeObjects.length === 0) return null;
+
+    // 이미 계산된 초기 bounding box가 있으면 그것을 반환
+    if (initialSelectionBounds.current) {
+      return initialSelectionBounds.current;
+    }
+
+    let left = Infinity;
+    let top = Infinity;
+    let right = -Infinity;
+    let bottom = -Infinity;
+
+    activeObjects.forEach((obj) => {
+      const objLeft = obj.left!;
+      const objTop = obj.top!;
+      const objRight = objLeft + obj.width!;
+      const objBottom = objTop + obj.height!;
+
+      left = Math.min(left, objLeft);
+      top = Math.min(top, objTop);
+      right = Math.max(right, objRight);
+      bottom = Math.max(bottom, objBottom);
+    });
+
+    initialSelectionBounds.current = { left, top, right, bottom }; // 초기 bounding box 저장
+
+    return { left, top, right, bottom };
+  };
+
+  // 선택 해제시 bounding box 영역 초기화
+  const resetSelectionBounds = () => {
+    initialSelectionBounds.current = null;
   };
 
   const alignLeft = () => {
-    if (selectedRects.length === 0) return; // 선택된 사각형이 없으면 함수 종료.
+    const canvas = canvasRef.current;
+    if (!canvas) return;
 
-    selectedRects.forEach((index) => {
-      rects.current[index].x = 10; // 모든 선택된 사각형의 X 좌표를 10으로 설정.
+    const selectionBounds = getSelectionBounds();
+    if (!selectionBounds) return;
+
+    const { left } = selectionBounds;
+
+    const objects = canvas.getActiveObjects();
+    if (objects.length === 0) return;
+
+    // 객체들을 `top` 값 기준으로 그룹화
+    const groups: Record<string, fabric.Object[]> = {}; // key를 string으로 설정
+    const tolerance = 5; // 같은 줄로 인식할 `top` 차이 허용 범위
+
+    objects.forEach((obj) => {
+      const objTop = obj.top || 0;
+
+      // 기존 그룹 중, `top` 값이 비슷한 그룹 찾기
+      let groupKey = Object.keys(groups).find(
+        (key) => Math.abs(parseFloat(key) - objTop) <= tolerance
+      );
+
+      if (!groupKey) {
+        groupKey = objTop.toString(); // 새로운 그룹 생성
+        groups[groupKey] = [];
+      }
+
+      groups[groupKey]!.push(obj); // groupKey가 string임을 보장
     });
-    draw();
+
+    // 각 그룹별로 타일형 정렬 수행
+    Object.values(groups).forEach((group) => {
+      group.sort((a, b) => (a.left || 0) - (b.left || 0));
+
+      let currentLeft = left;
+      group.forEach((obj) => {
+        obj.set({ left: currentLeft });
+        currentLeft += obj.width || 0; // 다음 객체를 오른쪽으로 배치
+      });
+    });
+
+    canvas.renderAll();
   };
 
   const alignCenter = () => {
-    if (selectedRects.length === 0) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const canvasWidth = canvas.width; // canvas의 폭 가져오기.
+    const selectionBounds = getSelectionBounds();
+    if (!selectionBounds) return;
 
-    selectedRects.forEach((index) => {
-      rects.current[index].x = (canvasWidth - rects.current[index].width) / 2;
+    const { left, right } = selectionBounds;
+    const centerX = (left + right) / 2;
+
+    const objects = canvas.getActiveObjects();
+    if (objects.length === 0) return;
+
+    // 객체들을 `top` 값 기준으로 그룹화
+    const groups: Record<string, fabric.Object[]> = {};
+    const tolerance = 5;
+
+    objects.forEach((obj) => {
+      const objTop = obj.top || 0;
+      let groupKey = Object.keys(groups).find(
+        (key) => Math.abs(parseFloat(key) - objTop) <= tolerance
+      );
+
+      if (!groupKey) {
+        groupKey = objTop.toString();
+        groups[groupKey] = [];
+      }
+
+      groups[groupKey]!.push(obj);
     });
-    draw();
+
+    // 각 그룹별로 타일형 정렬 수행
+    Object.values(groups).forEach((group) => {
+      group.sort((a, b) => (a.left || 0) - (b.left || 0));
+
+      let currentLeft =
+        centerX - group.reduce((sum, obj) => sum + (obj.width || 0), 0) / 2;
+      group.forEach((obj) => {
+        obj.set({ left: currentLeft });
+        currentLeft += obj.width || 0;
+      });
+    });
+
+    canvas.renderAll();
   };
 
   const alignRight = () => {
-    if (selectedRects.length === 0) return;
-
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const canvasWidth = canvas.width;
+    const selectionBounds = getSelectionBounds();
+    if (!selectionBounds) return;
 
-    selectedRects.forEach((index) => {
-      rects.current[index].x = canvasWidth - rects.current[index].width - 10;
+    const { right } = selectionBounds;
+
+    const objects = canvas.getActiveObjects();
+    if (objects.length === 0) return;
+
+    // 객체들을 `top` 값 기준으로 그룹화
+    const groups: Record<string, fabric.Object[]> = {};
+    const tolerance = 5;
+
+    objects.forEach((obj) => {
+      const objTop = obj.top || 0;
+      let groupKey = Object.keys(groups).find(
+        (key) => Math.abs(parseFloat(key) - objTop) <= tolerance
+      );
+
+      if (!groupKey) {
+        groupKey = objTop.toString();
+        groups[groupKey] = [];
+      }
+
+      groups[groupKey]!.push(obj);
     });
-    draw();
+
+    // 각 그룹별로 타일형 정렬 수행
+    Object.values(groups).forEach((group) => {
+      group.sort((a, b) => (a.left || 0) - (b.left || 0));
+
+      let currentRight = right;
+      group.reverse().forEach((obj) => {
+        obj.set({ left: currentRight - (obj.width || 0) });
+        currentRight -= obj.width || 0;
+      });
+    });
+
+    canvas.renderAll();
   };
 
   const alignTop = () => {
-    if (selectedRects.length === 0) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
 
-    selectedRects.forEach((index) => {
-      rects.current[index].y = 10;
+    const selectionBounds = getSelectionBounds();
+    if (!selectionBounds) return;
+
+    const { top } = selectionBounds;
+
+    const objects = canvas.getActiveObjects();
+    if (objects.length === 0) return;
+
+    // 객체들을 left 값 기준으로 그룹화 (같은 열에 있는 객체끼리)
+    const groups: Record<string, fabric.Object[]> = {};
+    const tolerance = 5; // 같은 열로 인식할 left 차이 허용 범위
+
+    objects.forEach((obj) => {
+      const objLeft = obj.left || 0;
+      let groupKey = Object.keys(groups).find(
+        (key) => Math.abs(parseFloat(key) - objLeft) <= tolerance
+      );
+      if (!groupKey) {
+        groupKey = objLeft.toString();
+        groups[groupKey] = [];
+      }
+      groups[groupKey]!.push(obj);
     });
-    draw();
+
+    // 각 그룹별로 타일형 정렬 (위에서 아래로)
+    Object.values(groups).forEach((group) => {
+      // top 값 기준 오름차순 정렬
+      group.sort((a, b) => (a.top || 0) - (b.top || 0));
+
+      let currentTop = top;
+      group.forEach((obj) => {
+        obj.set({ top: currentTop });
+        currentTop += obj.height || 0; // 다음 객체는 이전 객체 아래에 배치
+      });
+    });
+
+    canvas.renderAll();
   };
 
   const alignMiddle = () => {
-    if (selectedRects.length === 0) return;
-
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const canvasHeight = canvas.height;
+    const selectionBounds = getSelectionBounds();
+    if (!selectionBounds) return;
 
-    selectedRects.forEach((index) => {
-      rects.current[index].y = (canvasHeight - rects.current[index].height) / 2;
+    const { top, bottom } = selectionBounds;
+    const centerY = (top + bottom) / 2;
+
+    const objects = canvas.getActiveObjects();
+    if (objects.length === 0) return;
+
+    // left 좌표 기준으로 그룹화 (같은 열끼리)
+    const groups: Record<string, fabric.Object[]> = {};
+    const tolerance = 5;
+
+    objects.forEach((obj) => {
+      const objLeft = obj.left || 0;
+      let groupKey = Object.keys(groups).find(
+        (key) => Math.abs(parseFloat(key) - objLeft) <= tolerance
+      );
+      if (!groupKey) {
+        groupKey = objLeft.toString();
+        groups[groupKey] = [];
+      }
+      groups[groupKey]!.push(obj);
     });
-    draw();
+
+    // 각 그룹별로 타일형 중앙 정렬 수행
+    Object.values(groups).forEach((group) => {
+      group.sort((a, b) => (a.top || 0) - (b.top || 0));
+
+      // 그룹 내 전체 높이 계산
+      const totalHeight = group.reduce(
+        (sum, obj) => sum + (obj.height || 0),
+        0
+      );
+      // 그룹을 중앙에 두기 위한 시작 top 값
+      let startY = centerY - totalHeight / 2;
+
+      group.forEach((obj) => {
+        obj.set({ top: startY });
+        startY += obj.height || 0;
+      });
+    });
+
+    canvas.renderAll();
   };
 
   const alignBottom = () => {
-    if (selectedRects.length === 0) return;
-
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const canvasHeight = canvas.height;
+    const selectionBounds = getSelectionBounds();
+    if (!selectionBounds) return;
 
-    selectedRects.forEach((index) => {
-      rects.current[index].y = canvasHeight - rects.current[index].height - 10;
+    const { bottom } = selectionBounds;
+
+    const objects = canvas.getActiveObjects();
+    if (objects.length === 0) return;
+
+    // left 좌표 기준 그룹화
+    const groups: Record<string, fabric.Object[]> = {};
+    const tolerance = 5;
+
+    objects.forEach((obj) => {
+      const objLeft = obj.left || 0;
+      let groupKey = Object.keys(groups).find(
+        (key) => Math.abs(parseFloat(key) - objLeft) <= tolerance
+      );
+      if (!groupKey) {
+        groupKey = objLeft.toString();
+        groups[groupKey] = [];
+      }
+      groups[groupKey]!.push(obj);
     });
-    draw();
+
+    // 각 그룹별로 타일형 하단 정렬 수행
+    Object.values(groups).forEach((group) => {
+      group.sort((a, b) => (a.top || 0) - (b.top || 0));
+
+      let currentBottom = bottom;
+      // 하단 정렬을 위해 그룹 내 객체 순서를 역순으로 처리
+      group.reverse().forEach((obj) => {
+        obj.set({ top: currentBottom - (obj.height || 0) });
+        currentBottom -= obj.height || 0;
+      });
+    });
+
+    canvas.renderAll();
+  };
+
+  // top을 기준으로 그룹간 정렬 필요.
+  // 세로 균등 배치
+  const distributeVertically = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const selectionBounds = getSelectionBounds();
+    if (!selectionBounds) return;
+
+    const activeObjects = canvas.getActiveObjects();
+    if (activeObjects.length < 2) return; // 두 개 이상 선택해야 실행됨
+
+    const { top, bottom } = selectionBounds;
+    const totalHeight = bottom - top;
+    const numGaps = activeObjects.length - 1;
+    const totalObjectsHeight = activeObjects.reduce(
+      (sum, obj) => sum + obj.height!,
+      0
+    );
+    const gap = (totalHeight - totalObjectsHeight) / numGaps; // 균등 간격 계산
+
+    // 객체들을 top에서부터 균일한 간격으로 배치
+    let currentY = top;
+    activeObjects
+      .sort((a, b) => a.top! - b.top!) // 현재 위치 기준으로 정렬
+      .forEach((obj) => {
+        obj.set({ top: currentY });
+        currentY += obj.height! + gap; // 다음 객체의 위치 계산
+      });
+
+    canvas.renderAll();
+  };
+
+  // 가로 균등 배치
+  const distributeHorizontally = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const selectionBounds = getSelectionBounds();
+    if (!selectionBounds) return;
+
+    const activeObjects = canvas.getActiveObjects();
+    if (activeObjects.length < 2) return; // 두 개 이상 선택해야 실행됨
+
+    const { left, right } = selectionBounds;
+    const totalWidth = right - left;
+    const numGaps = activeObjects.length - 1;
+    const totalObjectsWidth = activeObjects.reduce(
+      (sum, obj) => sum + obj.width!,
+      0
+    );
+    const gap = (totalWidth - totalObjectsWidth) / numGaps; // 균등 간격 계산
+
+    // 객체들을 left에서부터 균일한 간격으로 배치
+    let currentX = left;
+    activeObjects
+      .sort((a, b) => a.left! - b.left!) // 현재 위치 기준으로 정렬
+      .forEach((obj) => {
+        obj.set({ left: currentX });
+        currentX += obj.width! + gap; // 다음 객체의 위치 계산
+      });
+
+    canvas.renderAll();
   };
 
   return (
@@ -457,19 +903,18 @@ const CanvasDemo: React.FC = () => {
       <div>
         <OrderWrapper>
           <div>
-            <ButtonGroup variant="contained" aria-label="Basic button group">
+            <ButtonGroup variant="contained">
               <Button>
-                <SvgIcon component={ListIcon} inheritViewBox />
+                <ListIcon />
               </Button>
               <Button onClick={increaseScale}>
-                {" "}
-                <SvgIcon component={AddIcon} inheritViewBox />
+                <AddIcon />
               </Button>
               <Button onClick={decreaseScale}>
-                <SvgIcon component={HorizontalRuleIcon} inheritViewBox />
+                <HorizontalRuleIcon />
               </Button>
               <Button onClick={resetScale}>
-                <SvgIcon component={ZoomOutMapIcon} inheritViewBox />
+                <ZoomOutMapIcon />
               </Button>
             </ButtonGroup>
             <ButtonGroup
@@ -487,26 +932,44 @@ const CanvasDemo: React.FC = () => {
           </div>
           <div>
             <ButtonGroup variant="outlined" aria-label="Basic button group">
-              <Button onClick={alignLeft}>좌측 정렬</Button>
-              <Button onClick={alignCenter}>중앙 정렬</Button>
-              <Button onClick={alignRight}>우측 정렬</Button>
-              <Button onClick={alignTop}>상단 정렬</Button>
-              <Button onClick={alignMiddle}>중앙 정렬</Button>
-              <Button onClick={alignBottom}>하단 정렬</Button>
+              <Button onClick={toggleSnapping}>
+                {isSnapping ? <GridOnIcon /> : <GridOffIcon />}
+              </Button>
+              <Button onClick={distributeVertically}>
+                <BorderVerticalIcon />
+              </Button>
+              <Button
+                onClick={distributeHorizontally}
+                sx={{ marginRight: "10px" }}
+              >
+                <BorderHorizontalIcon />
+              </Button>
+            </ButtonGroup>
+            <ButtonGroup variant="outlined" aria-label="Basic button group">
+              <Button onClick={alignLeft}>
+                <AlignHorizontalLeftIcon />
+              </Button>
+              <Button onClick={alignCenter}>
+                <AlignHorizontalCenterIcon />
+              </Button>
+              <Button onClick={alignRight}>
+                <AlignHorizontalRightIcon />
+              </Button>
+              <Button onClick={alignTop}>
+                <AlignVerticalTopIcon />
+              </Button>
+              <Button onClick={alignMiddle}>
+                <AlignVerticalCenterIcon />
+              </Button>
+              <Button onClick={alignBottom}>
+                <AlignVerticalBottomIcon />
+              </Button>
             </ButtonGroup>
           </div>
         </OrderWrapper>
-        <canvas
-          ref={canvasRef}
-          width={1300}
-          height={700}
-          style={{ border: "1px solid skyblue", borderRadius: "4px" }}
-          onMouseDown={handleMouseDown}
-          onMouseMove={handleMouseMove}
-          onMouseUp={handleMouseUp}
-          onWheel={handleWheel}
-          onClick={handleCanvasClick}
-        />
+        <div ref={containerRef} style={{ border: "1px solid skyblue" }}>
+          <canvas id="fabricCanvas" width={1300} height={700} />
+        </div>
       </div>
     </Wrapper>
   );
@@ -518,12 +981,15 @@ const Wrapper = styled.div`
   display: flex;
   justify-content: center;
   align-items: center;
-  /* border: 2px solid green; */
-  height: 90%; // 퍼센트..모르겠다
+  /*border: 2px solid green;*/
+  height: 90%;
 `;
 
 const OrderWrapper = styled.div`
   display: flex;
   justify-content: space-between;
-  margin-bottom: 5px;
+  /* align-items: center; */
+  width: 100%;
+  margin-bottom: 10px;
+  /* border: 2px solid red; */
 `;
