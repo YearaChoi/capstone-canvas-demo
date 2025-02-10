@@ -95,17 +95,7 @@ const CanvasDemo: React.FC = () => {
           });
 
           // 텍스트와 사각형을 그룹화하여 하나의 객체처럼 다루기
-          const group = new fabric.Group([rect, text], {
-            // left: rect.left,
-            // top: rect.top,
-            // lockRotation: false,
-            // lockScalingFlip: false,
-            // lockScalingX: false,
-            // lockScalingY: false,
-            // hasControls: false,
-            // hoverCursor: "grab",
-            // moveCursor: "grabbing",
-          });
+          const group = new fabric.Group([rect, text], {});
 
           canvas.add(group);
         }
@@ -459,6 +449,8 @@ const CanvasDemo: React.FC = () => {
       const selectedObject = canvas.getActiveObject();
       if (selectedObject === null || selectedObject === undefined) return;
       selectedObject.hasControls = false;
+      selectedObject.borderScaleFactor = 1.5;
+      // selectedObject.borderColor = "#0091ea";
       resetSelectionBounds();
     };
 
