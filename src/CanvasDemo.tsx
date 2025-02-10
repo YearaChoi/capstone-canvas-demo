@@ -54,7 +54,7 @@ const CanvasDemo: React.FC = () => {
     if (containerRef.current) {
       const canvas = new fabric.Canvas("fabricCanvas", {
         selection: true,
-        backgroundColor: "skyblue",
+        backgroundColor: "#b3e5fc",
       });
 
       fabric.FabricImage.fromURL(bgImg).then((img) => {
@@ -72,7 +72,7 @@ const CanvasDemo: React.FC = () => {
           const rect = new fabric.Rect({
             left: 50 + i * 120,
             top: 100,
-            fill: "hsl(186.15384615384616, 92.85714285714289%, 83.52941176470588%)",
+            fill: "#b3e5fc",
             width: 100,
             height: 40,
             selectable: true,
@@ -1088,7 +1088,7 @@ const CanvasDemo: React.FC = () => {
             </ButtonGroup>
           </div>
         </OrderWrapper>
-        <div ref={containerRef} style={{ border: "1px solid skyblue" }}>
+        <div ref={containerRef} style={{ border: "1px solid #b3e5fc" }}>
           <canvas id="fabricCanvas" width={1300} height={700} />
         </div>
       </div>
