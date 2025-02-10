@@ -2,7 +2,15 @@ import React, { useRef, useEffect, useState, useCallback } from "react";
 import styled from "styled-components";
 import * as fabric from "fabric";
 import bgImg from "./assets/img/bgImg3.png";
-import { Button, ButtonGroup } from "@mui/material";
+import {
+  Button,
+  ButtonGroup,
+  FormControl,
+  InputLabel,
+  MenuItem,
+  Select,
+  SelectChangeEvent,
+} from "@mui/material";
 import SvgIcon from "@mui/material/SvgIcon";
 import AddIcon from "@mui/icons-material/Add";
 import HorizontalRuleIcon from "@mui/icons-material/HorizontalRule";
@@ -40,6 +48,7 @@ const CanvasDemo: React.FC = () => {
   ////
 
   const [isSnapping, setIsSnapping] = useState(true);
+  const [zoomPercentage, setZoomPercentage] = useState(100);
 
   useEffect(() => {
     if (containerRef.current) {
@@ -485,6 +494,7 @@ const CanvasDemo: React.FC = () => {
 
     // 스케일을 1로 설정
     setScale(1);
+    setZoomPercentage(100); // 비율 업데이트
 
     // 캔버스의 중앙 좌표 계산 (width와 height를 사용)
     const center = new fabric.Point(canvas.width! / 2, canvas.height! / 2);
@@ -501,6 +511,7 @@ const CanvasDemo: React.FC = () => {
 
     // 새로운 스케일로 zoom을 설정
     canvas.zoomToPoint(center, newScale);
+    setZoomPercentage(Math.round(newScale * 100)); // 비율 업데이트
   };
 
   useEffect(() => {
@@ -518,6 +529,7 @@ const CanvasDemo: React.FC = () => {
       const pointer = new fabric.Point(event.offsetX, event.offsetY);
       canvas.zoomToPoint(pointer, newScale);
       setScale(newScale);
+      setZoomPercentage(Math.round(newScale * 100)); // 비율 업데이트
     };
 
     canvas.wrapperEl?.addEventListener("wheel", handleWheelZoom);
@@ -526,6 +538,22 @@ const CanvasDemo: React.FC = () => {
       canvas.wrapperEl?.removeEventListener("wheel", handleWheelZoom);
     };
   }, [scale]);
+
+  // zoomPercentage가 변경될 때 scale 값 업데이트
+  useEffect(() => {
+    const newScale = zoomPercentage / 100;
+    setScale(newScale);
+
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const center = new fabric.Point(canvas.width! / 2, canvas.height! / 2);
+    canvas.zoomToPoint(center, newScale);
+  }, [zoomPercentage]);
+
+  const handleChangeZoom = (event: SelectChangeEvent<number>) => {
+    setZoomPercentage(event.target.value as number);
+  };
 
   const getSelectionBounds = () => {
     const canvas = canvasRef.current;
@@ -957,11 +985,8 @@ const CanvasDemo: React.FC = () => {
     <Wrapper>
       <div>
         <OrderWrapper>
-          <div>
-            <ButtonGroup variant="contained">
-              {/* <Button>
-                <ListIcon />
-              </Button> */}
+          <OrderLeft>
+            <ButtonGroup variant="contained" sx={{ marginRight: "6px" }}>
               <Button onClick={increaseScale}>
                 <AddIcon />
               </Button>
@@ -972,6 +997,47 @@ const CanvasDemo: React.FC = () => {
                 <ZoomOutMapIcon />
               </Button>
             </ButtonGroup>
+            <FormControl
+              sx={{
+                m: 1,
+                minWidth: 90,
+                height: 36,
+                margin: "none",
+              }}
+              size="small"
+            >
+              <InputLabel
+                id="demo-select-small-label"
+                sx={{ color: "primary.main" }}
+              >
+                zoom
+              </InputLabel>
+              <Select
+                labelId="demo-select-small-label"
+                id="demo-select-small"
+                value={zoomPercentage}
+                label="zoom"
+                onChange={handleChangeZoom}
+                renderValue={(value) => `${value}%`} // 현재 값을 %로 변환하여 표시
+                sx={{
+                  color: "primary.main",
+                  fontSize: 14,
+                  ".MuiOutlinedInput-notchedOutline": {
+                    borderColor: "#2196f3",
+                  },
+                  "&:hover .MuiOutlinedInput-notchedOutline": {
+                    borderColor: "primary.main",
+                  }, // 호버 시 색상 변경
+                }}
+              >
+                <MenuItem value={70}>70%</MenuItem>
+                <MenuItem value={90}>90%</MenuItem>
+                <MenuItem value={110}>110%</MenuItem>
+                <MenuItem value={130}>130%</MenuItem>
+                <MenuItem value={150}>150%</MenuItem>
+              </Select>
+            </FormControl>
+
             <ButtonGroup
               variant="outlined"
               aria-label="Basic button group"
@@ -984,7 +1050,7 @@ const CanvasDemo: React.FC = () => {
                 <SvgIcon component={RedoIcon} inheritViewBox />
               </Button>
             </ButtonGroup>
-          </div>
+          </OrderLeft>
           <div>
             <ButtonGroup variant="outlined" aria-label="Basic button group">
               <Button onClick={toggleSnapping}>
@@ -1043,8 +1109,14 @@ const Wrapper = styled.div`
 const OrderWrapper = styled.div`
   display: flex;
   justify-content: space-between;
-  /* align-items: center; */
+  align-items: flex-end;
   width: 100%;
   margin-bottom: 10px;
   /* border: 2px solid red; */
+`;
+
+const OrderLeft = styled.div`
+  /* border: 2px solid blue; */
+  display: flex;
+  align-items: flex-end;
 `;
