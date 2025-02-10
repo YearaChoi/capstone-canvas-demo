@@ -40,6 +40,7 @@ const CanvasDemo: React.FC = () => {
   ////
 
   const [isSnapping, setIsSnapping] = useState(true);
+  const [zoomPercentage, setZoomPercentage] = useState(100);
 
   useEffect(() => {
     if (containerRef.current) {
@@ -485,6 +486,7 @@ const CanvasDemo: React.FC = () => {
 
     // 스케일을 1로 설정
     setScale(1);
+    setZoomPercentage(100); // 비율 업데이트
 
     // 캔버스의 중앙 좌표 계산 (width와 height를 사용)
     const center = new fabric.Point(canvas.width! / 2, canvas.height! / 2);
@@ -501,6 +503,7 @@ const CanvasDemo: React.FC = () => {
 
     // 새로운 스케일로 zoom을 설정
     canvas.zoomToPoint(center, newScale);
+    setZoomPercentage(Math.round(newScale * 100)); // 비율 업데이트
   };
 
   useEffect(() => {
@@ -518,6 +521,7 @@ const CanvasDemo: React.FC = () => {
       const pointer = new fabric.Point(event.offsetX, event.offsetY);
       canvas.zoomToPoint(pointer, newScale);
       setScale(newScale);
+      setZoomPercentage(Math.round(newScale * 100)); // 비율 업데이트
     };
 
     canvas.wrapperEl?.addEventListener("wheel", handleWheelZoom);
@@ -972,6 +976,7 @@ const CanvasDemo: React.FC = () => {
                 <ZoomOutMapIcon />
               </Button>
             </ButtonGroup>
+            <span>{zoomPercentage}</span>
             <ButtonGroup
               variant="outlined"
               aria-label="Basic button group"
