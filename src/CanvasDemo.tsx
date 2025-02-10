@@ -46,7 +46,7 @@ const CanvasDemo: React.FC = () => {
   const [canRedo, setCanRedo] = useState(false);
   const history = useRef<string[]>([]);
   const historyIndex = useRef<number>(-1);
-  const [gridPixel, setGridPixel] = React.useState<number>(100); // 현재 그리드 간격 픽셀수
+  const [gridPixel, setGridPixel] = React.useState<number>(50); // 현재 그리드 간격 픽셀수
   ////
 
   const [isSnapping, setIsSnapping] = useState(true);
@@ -1048,10 +1048,23 @@ const CanvasDemo: React.FC = () => {
               </Select>
             </FormControl>
 
+            <GridDropdown gridPixel={gridPixel} setGridPixel={setGridPixel} />
             <ButtonGroup
               variant="outlined"
               aria-label="Basic button group"
               sx={{ marginLeft: "10px" }}
+            >
+              <Button onClick={toggleSnapping}>
+                {isSnapping ? <GridOnIcon /> : <GridOffIcon />}
+              </Button>
+            </ButtonGroup>
+          </OrderLeft>
+
+          <div>
+            <ButtonGroup
+              variant="outlined"
+              aria-label="Basic button group"
+              sx={{ marginRight: "10px" }}
             >
               <Button onClick={undo}>
                 <SvgIcon component={UndoIcon} inheritViewBox />
@@ -1060,14 +1073,7 @@ const CanvasDemo: React.FC = () => {
                 <SvgIcon component={RedoIcon} inheritViewBox />
               </Button>
             </ButtonGroup>
-          <GridDropdown gridPixel={gridPixel} setGridPixel={setGridPixel} />
-          </OrderLeft>
-
-          <div>
             <ButtonGroup variant="outlined" aria-label="Basic button group">
-              <Button onClick={toggleSnapping}>
-                {isSnapping ? <GridOnIcon /> : <GridOffIcon />}
-              </Button>
               <Button onClick={distributeVertically}>
                 <BorderVerticalIcon />
               </Button>
