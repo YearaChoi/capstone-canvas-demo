@@ -28,6 +28,7 @@ import AlignHorizontalCenterIcon from "@mui/icons-material/AlignHorizontalCenter
 import AlignVerticalCenterIcon from "@mui/icons-material/AlignVerticalCenter";
 import BorderHorizontalIcon from "@mui/icons-material/BorderHorizontal";
 import BorderVerticalIcon from "@mui/icons-material/BorderVertical";
+import GridDropdown from "./components/GridDropdown";
 
 const CanvasDemo: React.FC = () => {
   const canvasRef = useRef<fabric.Canvas | null>(null);
@@ -45,10 +46,16 @@ const CanvasDemo: React.FC = () => {
   const [canRedo, setCanRedo] = useState(false);
   const history = useRef<string[]>([]);
   const historyIndex = useRef<number>(-1);
+  const [gridPixel, setGridPixel] = React.useState<number>(100); // 현재 그리드 간격 픽셀수
   ////
 
   const [isSnapping, setIsSnapping] = useState(true);
   const [zoomPercentage, setZoomPercentage] = useState(100);
+
+  React.useEffect(() => {
+    console.log("Parent gridPixel updated:", gridPixel);
+    setGridPixel(gridPixel);
+  }, [gridPixel]);
 
   useEffect(() => {
     if (containerRef.current) {
@@ -339,35 +346,38 @@ const CanvasDemo: React.FC = () => {
     setIsSnapping((prev) => !prev);
   };
 
-  const snapToGrid = (event: fabric.TEvent) => {
-    if (!isSnapping) return;
+  const snapToGridRef = React.useRef<(event: fabric.TEvent) => void>(() => {});
+  React.useEffect(() => {
+    snapToGridRef.current = (event: fabric.TEvent) => {
+      if (!isSnapping) return;
 
-    const obj = (event as any).target; // 현재 이동 중인 객체만 가져옴
-    if (!obj || !(obj instanceof fabric.Group)) return;
+      const obj = (event as any).target;
+      if (!obj || !(obj instanceof fabric.Group)) return;
 
-    obj.set({
-      left: Math.round(obj.left! / 22) * 22,
-      top: Math.round(obj.top! / 22) * 22,
-    });
+      console.log("snap to grid", gridPixel); // 항상 최신 값 사용
 
-    obj.setCoords(); // 위치 업데이트
-    canvasRef.current!.renderAll();
-  };
+      obj.set({
+        left: Math.round(obj.left! / gridPixel) * gridPixel,
+        top: Math.round(obj.top! / gridPixel) * gridPixel,
+      });
 
-  useEffect(() => {
+      obj.setCoords();
+      canvasRef.current!.renderAll();
+    };
+  }, [gridPixel, isSnapping]); // 최신 gridPixel과 isSnapping 유지
+
+  React.useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    if (isSnapping) {
-      canvas.on("object:moving", snapToGrid);
-    } else {
-      canvas.off("object:moving", snapToGrid);
-    }
+    const handleSnap = (event: fabric.TEvent) => snapToGridRef.current(event);
+
+    canvas.on("object:moving", handleSnap);
 
     return () => {
-      canvas.off("object:moving", snapToGrid);
+      canvas.off("object:moving", handleSnap); // 정확한 리스너 제거
     };
-  }, [isSnapping]);
+  }, []);
 
   // 키보드로 선택된 요소 상하좌우 이동
   const moveSelection = (event: KeyboardEvent) => {
@@ -1050,7 +1060,9 @@ const CanvasDemo: React.FC = () => {
                 <SvgIcon component={RedoIcon} inheritViewBox />
               </Button>
             </ButtonGroup>
+          <GridDropdown gridPixel={gridPixel} setGridPixel={setGridPixel} />
           </OrderLeft>
+
           <div>
             <ButtonGroup variant="outlined" aria-label="Basic button group">
               <Button onClick={toggleSnapping}>
