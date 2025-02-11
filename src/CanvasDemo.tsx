@@ -1012,7 +1012,7 @@ const CanvasDemo: React.FC = () => {
 
   return (
     <Wrapper>
-      <div>
+      <div style={{ marginTop: "50px" }}>
         <OrderWrapper>
           <OrderLeft>
             <ButtonGroup variant="contained" sx={{ marginRight: "6px" }}>
@@ -1140,8 +1140,8 @@ const Wrapper = styled.div`
   display: flex;
   justify-content: center;
   align-items: center;
-  /*border: 2px solid green;*/
-  height: 90%;
+  /* border: 2px solid green; */
+  /* height: 90vh; */
 `;
 
 const OrderWrapper = styled.div`
