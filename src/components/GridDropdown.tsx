@@ -47,9 +47,9 @@ export default function GridDropdown({
           }, // 호버 시 색상 변경
         }}
       >
-        <MenuItem value="50">50px</MenuItem>
-        <MenuItem value="25">25px</MenuItem>
         <MenuItem value="12.5">12.5px</MenuItem>
+        <MenuItem value="25">25px</MenuItem>
+        <MenuItem value="50">50px</MenuItem>
       </Select>
     </FormControl>
   );
