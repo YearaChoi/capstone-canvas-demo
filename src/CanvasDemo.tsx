@@ -46,7 +46,7 @@ const CanvasDemo: React.FC = () => {
   const [canRedo, setCanRedo] = useState(false);
   const history = useRef<string[]>([]);
   const historyIndex = useRef<number>(-1);
-  const [gridPixel, setGridPixel] = React.useState<number>(50); // 현재 그리드 간격 픽셀수
+  const [gridPixel, setGridPixel] = React.useState<number>(25); // 현재 그리드 간격 픽셀수
   ////
 
   const [isSnapping, setIsSnapping] = useState(true);
@@ -1012,7 +1012,7 @@ const CanvasDemo: React.FC = () => {
 
   return (
     <Wrapper>
-      <div>
+      <div style={{ marginTop: "50px" }}>
         <OrderWrapper>
           <OrderLeft>
             <ButtonGroup variant="contained" sx={{ marginRight: "6px" }}>
@@ -1061,6 +1061,7 @@ const CanvasDemo: React.FC = () => {
               >
                 <MenuItem value={70}>70%</MenuItem>
                 <MenuItem value={90}>90%</MenuItem>
+                <MenuItem value={100}>100%</MenuItem>
                 <MenuItem value={110}>110%</MenuItem>
                 <MenuItem value={130}>130%</MenuItem>
                 <MenuItem value={150}>150%</MenuItem>
@@ -1139,8 +1140,8 @@ const Wrapper = styled.div`
   display: flex;
   justify-content: center;
   align-items: center;
-  /*border: 2px solid green;*/
-  height: 90%;
+  /* border: 2px solid green; */
+  /* height: 90vh; */
 `;
 
 const OrderWrapper = styled.div`
