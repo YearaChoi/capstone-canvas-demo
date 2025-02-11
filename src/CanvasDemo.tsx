@@ -288,6 +288,33 @@ const CanvasDemo: React.FC = () => {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [undo, redo]); // undo, redo가 변경될 일이 없도록 useCallback 적용
 
+  // 캔버스 내 요소 전체 선택
+  useEffect(() => {
+    const canvas = canvasRef.current;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.metaKey || event.ctrlKey) {
+        if (event.key === "a") {
+          event.preventDefault(); // 기본 Ctrl + A 동작 방지 (브라우저 텍스트 선택 차단)
+          if (canvas) {
+            const allObjects = canvas.getObjects();
+            if (allObjects.length > 0) {
+              canvas.discardActiveObject(); // 기존 선택 해제
+              const selection = new fabric.ActiveSelection(allObjects, {
+                canvas,
+              });
+              canvas.setActiveObject(selection);
+              canvas.requestRenderAll();
+            }
+          }
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
   // 요소가 캔버스 영역  안에서만 이동되도록 제한
   useEffect(() => {
     const canvas = canvasRef.current;
