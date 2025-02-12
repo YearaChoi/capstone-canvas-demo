@@ -31,7 +31,10 @@ import BorderHorizontalIcon from "@mui/icons-material/BorderHorizontal";
 import BorderVerticalIcon from "@mui/icons-material/BorderVertical";
 import GridDropdown from "./components/GridDropdown";
 import { TEvent } from "fabric"; // IEvent 대신 TEvent 사용
-
+import ContentCopyIcon from "@mui/icons-material/ContentCopy"; // 복제 아이콘
+import DeleteOutlinedIcon from "@mui/icons-material/DeleteOutlineOutlined";
+import ArticleOutlinedIcon from "@mui/icons-material/ArticleOutlined";
+import SidePanel from "./components/SidePanel";
 const CanvasDemo: React.FC = () => {
   const canvasRef = useRef<fabric.Canvas | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -57,6 +60,8 @@ const CanvasDemo: React.FC = () => {
   const history = useRef<string[]>([]);
   const historyIndex = useRef<number>(-1);
   const [gridPixel, setGridPixel] = React.useState<number>(50); // 현재 그리드 간격 픽셀수
+  const [sidePanel, setSidePanel] = useState(false); // 정보 사이드패널
+
   ////
 
   const [isSnapping, setIsSnapping] = useState(true);
@@ -1161,6 +1166,7 @@ const CanvasDemo: React.FC = () => {
         <div ref={containerRef} style={{ border: "1px solid #b3e5fc" }}>
           <canvas id="fabricCanvas" width={1300} height={700} />
         </div>
+
         <Menu
           open={contextMenu !== null}
           onClose={handleClose}
@@ -1174,14 +1180,33 @@ const CanvasDemo: React.FC = () => {
           <MenuItem
             onClick={() => console.log("디바이스 삭제:", contextMenu?.target)}
           >
-            삭제
+            <MenuText>
+              <ContentCopyIcon />
+              <span>복제</span>
+            </MenuText>
           </MenuItem>
           <MenuItem
-            onClick={() => console.log("디바이스 정보:", contextMenu?.target)}
+            onClick={() => console.log("디바이스 삭제:", contextMenu?.target)}
           >
-            정보 보기
+            <MenuText>
+              <DeleteOutlinedIcon />
+              <span>삭제</span>
+            </MenuText>
+          </MenuItem>
+          <MenuItem
+            onClick={() => {
+              console.log("정보 보기 클릭됨!");
+              setSidePanel(true);
+              handleClose();
+            }}
+          >
+            <MenuText>
+              <ArticleOutlinedIcon />
+              <span>정보 보기</span>
+            </MenuText>
           </MenuItem>
         </Menu>
+        <SidePanel sidePanel={sidePanel} setSidePanel={setSidePanel} />
       </div>
     </Wrapper>
   );
@@ -1210,4 +1235,16 @@ const OrderLeft = styled.div`
   /* border: 2px solid blue; */
   display: flex;
   align-items: flex-end;
+`;
+const MenuText = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: small;
+
+  > svg {
+    margin-right: 10px;
+    font-size: large;
+    /* border: 2px solid red; */
+  }
 `;
