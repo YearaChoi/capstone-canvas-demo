@@ -8,6 +8,7 @@ import {
   FormControl,
   InputLabel,
   MenuItem,
+  Menu,
   Select,
   SelectChangeEvent,
 } from "@mui/material";
@@ -29,6 +30,7 @@ import AlignVerticalCenterIcon from "@mui/icons-material/AlignVerticalCenter";
 import BorderHorizontalIcon from "@mui/icons-material/BorderHorizontal";
 import BorderVerticalIcon from "@mui/icons-material/BorderVertical";
 import GridDropdown from "./components/GridDropdown";
+import { TEvent } from "fabric"; // IEvent 대신 TEvent 사용
 
 const CanvasDemo: React.FC = () => {
   const canvasRef = useRef<fabric.Canvas | null>(null);
@@ -39,6 +41,14 @@ const CanvasDemo: React.FC = () => {
     right: number;
     bottom: number;
   } | null>(null);
+
+  // context menu 상태 저장 부분
+  const [contextMenu, setContextMenu] = useState<{
+    mouseX: number;
+    mouseY: number;
+    target: fabric.Group | null;
+  } | null>(null);
+  // context menu 상태 저장 부분
 
   //// 묶어서 커스텀 훅으로 잘 만들기
   const [scale, setScale] = useState(1);
@@ -56,7 +66,22 @@ const CanvasDemo: React.FC = () => {
     console.log("Parent gridPixel updated:", gridPixel);
     setGridPixel(gridPixel);
   }, [gridPixel]);
+  useEffect(() => {
+    if (!containerRef.current) return;
 
+    const handleContextMenu = (event: MouseEvent) => {
+      event.preventDefault(); // 기본 컨텍스트 메뉴 방지
+    };
+
+    containerRef.current.addEventListener("contextmenu", handleContextMenu);
+
+    return () => {
+      containerRef.current?.removeEventListener(
+        "contextmenu",
+        handleContextMenu
+      );
+    };
+  }, []);
   useEffect(() => {
     if (containerRef.current) {
       const canvas = new fabric.Canvas("fabricCanvas", {
@@ -126,6 +151,44 @@ const CanvasDemo: React.FC = () => {
       };
     }
   }, []);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const handleRightClick = (
+      event: fabric.TPointerEventInfo<fabric.TPointerEvent>
+    ) => {
+      const mouseEvent = event.e as MouseEvent;
+      mouseEvent.preventDefault();
+      console.log("마우스클릭");
+      // if (mouseEvent.buttons === 3) console.log("3");
+      if (mouseEvent.buttons !== 3) return; // 우클릭만 감지
+
+      const target = canvasRef.current?.findTarget(event.e);
+      // const target = event.target;
+      console.log("우클릭");
+      if (target instanceof fabric.Group) {
+        setContextMenu({
+          mouseX: mouseEvent.clientX,
+          mouseY: mouseEvent.clientY,
+          target: target, // 선택된 그룹 저장
+        });
+      } else {
+        setContextMenu(null);
+      }
+    };
+
+    canvas.on("mouse:down", handleRightClick);
+
+    return () => {
+      canvas.off("mouse:down", handleRightClick);
+    };
+  }, []);
+
+  const handleClose = () => {
+    setContextMenu(null);
+  };
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -1101,6 +1164,27 @@ const CanvasDemo: React.FC = () => {
         <div ref={containerRef} style={{ border: "1px solid #b3e5fc" }}>
           <canvas id="fabricCanvas" width={1300} height={700} />
         </div>
+        <Menu
+          open={contextMenu !== null}
+          onClose={handleClose}
+          anchorReference="anchorPosition"
+          anchorPosition={
+            contextMenu !== null
+              ? { top: contextMenu.mouseY, left: contextMenu.mouseX }
+              : undefined
+          }
+        >
+          <MenuItem
+            onClick={() => console.log("디바이스 삭제:", contextMenu?.target)}
+          >
+            삭제
+          </MenuItem>
+          <MenuItem
+            onClick={() => console.log("디바이스 정보:", contextMenu?.target)}
+          >
+            정보 보기
+          </MenuItem>
+        </Menu>
       </div>
     </Wrapper>
   );
