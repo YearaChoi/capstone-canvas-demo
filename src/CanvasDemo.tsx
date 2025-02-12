@@ -70,7 +70,7 @@ const CanvasDemo: React.FC = () => {
     if (!containerRef.current) return;
 
     const handleContextMenu = (event: MouseEvent) => {
-      event.preventDefault(); // 기본 컨텍스트 메뉴 방지
+      event.preventDefault();
     };
 
     containerRef.current.addEventListener("contextmenu", handleContextMenu);
@@ -156,33 +156,30 @@ const CanvasDemo: React.FC = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const handleRightClick = (
-      event: fabric.TPointerEventInfo<fabric.TPointerEvent>
-    ) => {
-      const mouseEvent = event.e as MouseEvent;
-      mouseEvent.preventDefault();
-      console.log("마우스클릭");
-      // if (mouseEvent.buttons === 3) console.log("3");
-      if (mouseEvent.buttons !== 3) return; // 우클릭만 감지
+    const handleRightClick = (event: MouseEvent) => {
+      event.preventDefault(); // 기본 컨텍스트 메뉴 방지
+      console.log("우클릭 감지됨!");
 
-      const target = canvasRef.current?.findTarget(event.e);
-      // const target = event.target;
-      console.log("우클릭");
+      const target = canvas.findTarget(event) as fabric.Group | null;
+      console.log("타겟:", target);
+
       if (target instanceof fabric.Group) {
         setContextMenu({
-          mouseX: mouseEvent.clientX,
-          mouseY: mouseEvent.clientY,
+          mouseX: event.clientX,
+          mouseY: event.clientY,
           target: target, // 선택된 그룹 저장
         });
+        console.log("컨텍스트 메뉴 표시!");
       } else {
         setContextMenu(null);
       }
     };
 
-    canvas.on("mouse:down", handleRightClick);
+    // `contextmenu` 이벤트를 감지하여 우클릭 시 메뉴 표시
+    canvas.wrapperEl.addEventListener("contextmenu", handleRightClick);
 
     return () => {
-      canvas.off("mouse:down", handleRightClick);
+      canvas.wrapperEl.removeEventListener("contextmenu", handleRightClick);
     };
   }, []);
 
