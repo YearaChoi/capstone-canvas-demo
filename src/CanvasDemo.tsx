@@ -8,6 +8,7 @@ import {
   FormControl,
   InputLabel,
   MenuItem,
+  Menu,
   Select,
   SelectChangeEvent,
 } from "@mui/material";
@@ -29,7 +30,11 @@ import AlignVerticalCenterIcon from "@mui/icons-material/AlignVerticalCenter";
 import BorderHorizontalIcon from "@mui/icons-material/BorderHorizontal";
 import BorderVerticalIcon from "@mui/icons-material/BorderVertical";
 import GridDropdown from "./components/GridDropdown";
-
+import { TEvent } from "fabric"; // IEvent 대신 TEvent 사용
+import ContentCopyIcon from "@mui/icons-material/ContentCopy"; // 복제 아이콘
+import DeleteOutlinedIcon from "@mui/icons-material/DeleteOutlineOutlined";
+import ArticleOutlinedIcon from "@mui/icons-material/ArticleOutlined";
+import SidePanel from "./components/SidePanel";
 const CanvasDemo: React.FC = () => {
   const canvasRef = useRef<fabric.Canvas | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -40,6 +45,14 @@ const CanvasDemo: React.FC = () => {
     bottom: number;
   } | null>(null);
 
+  // context menu 상태 저장 부분
+  const [contextMenu, setContextMenu] = useState<{
+    mouseX: number;
+    mouseY: number;
+    target: fabric.Group | null;
+  } | null>(null);
+  // context menu 상태 저장 부분
+
   //// 묶어서 커스텀 훅으로 잘 만들기
   const [scale, setScale] = useState(1);
   const [canUndo, setCanUndo] = useState(false);
@@ -47,6 +60,7 @@ const CanvasDemo: React.FC = () => {
   const history = useRef<string[]>([]);
   const historyIndex = useRef<number>(-1);
   const [gridPixel, setGridPixel] = React.useState<number>(25); // 현재 그리드 간격 픽셀수
+  const [sidePanel, setSidePanel] = useState(false); // 정보 사이드패널
   ////
 
   const [isSnapping, setIsSnapping] = useState(true);
@@ -56,7 +70,22 @@ const CanvasDemo: React.FC = () => {
     console.log("Parent gridPixel updated:", gridPixel);
     setGridPixel(gridPixel);
   }, [gridPixel]);
+  useEffect(() => {
+    if (!containerRef.current) return;
 
+    const handleContextMenu = (event: MouseEvent) => {
+      event.preventDefault();
+    };
+
+    containerRef.current.addEventListener("contextmenu", handleContextMenu);
+
+    return () => {
+      containerRef.current?.removeEventListener(
+        "contextmenu",
+        handleContextMenu
+      );
+    };
+  }, []);
   useEffect(() => {
     if (containerRef.current) {
       const canvas = new fabric.Canvas("fabricCanvas", {
@@ -126,6 +155,41 @@ const CanvasDemo: React.FC = () => {
       };
     }
   }, []);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const handleRightClick = (event: MouseEvent) => {
+      event.preventDefault(); // 기본 컨텍스트 메뉴 방지
+      console.log("우클릭 감지됨!");
+
+      const target = canvas.findTarget(event) as fabric.Group | null;
+      console.log("타겟:", target);
+
+      if (target instanceof fabric.Group) {
+        setContextMenu({
+          mouseX: event.clientX,
+          mouseY: event.clientY,
+          target: target, // 선택된 그룹 저장
+        });
+        console.log("컨텍스트 메뉴 표시!");
+      } else {
+        setContextMenu(null);
+      }
+    };
+
+    // `contextmenu` 이벤트를 감지하여 우클릭 시 메뉴 표시
+    canvas.wrapperEl.addEventListener("contextmenu", handleRightClick);
+
+    return () => {
+      canvas.wrapperEl.removeEventListener("contextmenu", handleRightClick);
+    };
+  }, []);
+
+  const handleClose = () => {
+    setContextMenu(null);
+  };
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -1129,6 +1193,47 @@ const CanvasDemo: React.FC = () => {
         <div ref={containerRef} style={{ border: "1px solid #b3e5fc" }}>
           <canvas id="fabricCanvas" width={1300} height={700} />
         </div>
+
+        <Menu
+          open={contextMenu !== null}
+          onClose={handleClose}
+          anchorReference="anchorPosition"
+          anchorPosition={
+            contextMenu !== null
+              ? { top: contextMenu.mouseY, left: contextMenu.mouseX }
+              : undefined
+          }
+        >
+          <MenuItem
+            onClick={() => console.log("디바이스 삭제:", contextMenu?.target)}
+          >
+            <MenuText>
+              <ContentCopyIcon />
+              <span>복제</span>
+            </MenuText>
+          </MenuItem>
+          <MenuItem
+            onClick={() => console.log("디바이스 삭제:", contextMenu?.target)}
+          >
+            <MenuText>
+              <DeleteOutlinedIcon />
+              <span>삭제</span>
+            </MenuText>
+          </MenuItem>
+          <MenuItem
+            onClick={() => {
+              console.log("정보 보기 클릭됨!");
+              setSidePanel(true);
+              handleClose();
+            }}
+          >
+            <MenuText>
+              <ArticleOutlinedIcon />
+              <span>정보 보기</span>
+            </MenuText>
+          </MenuItem>
+        </Menu>
+        <SidePanel sidePanel={sidePanel} setSidePanel={setSidePanel} />
       </div>
     </Wrapper>
   );
@@ -1157,4 +1262,16 @@ const OrderLeft = styled.div`
   /* border: 2px solid blue; */
   display: flex;
   align-items: flex-end;
+`;
+const MenuText = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: small;
+
+  > svg {
+    margin-right: 10px;
+    font-size: large;
+    /* border: 2px solid red; */
+  }
 `;
