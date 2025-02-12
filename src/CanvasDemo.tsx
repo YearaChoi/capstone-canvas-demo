@@ -59,9 +59,8 @@ const CanvasDemo: React.FC = () => {
   const [canRedo, setCanRedo] = useState(false);
   const history = useRef<string[]>([]);
   const historyIndex = useRef<number>(-1);
-  const [gridPixel, setGridPixel] = React.useState<number>(50); // 현재 그리드 간격 픽셀수
+  const [gridPixel, setGridPixel] = React.useState<number>(25); // 현재 그리드 간격 픽셀수
   const [sidePanel, setSidePanel] = useState(false); // 정보 사이드패널
-
   ////
 
   const [isSnapping, setIsSnapping] = useState(true);
@@ -352,6 +351,33 @@ const CanvasDemo: React.FC = () => {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [undo, redo]); // undo, redo가 변경될 일이 없도록 useCallback 적용
+
+  // 캔버스 내 요소 전체 선택
+  useEffect(() => {
+    const canvas = canvasRef.current;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.metaKey || event.ctrlKey) {
+        if (event.key === "a") {
+          event.preventDefault(); // 기본 Ctrl + A 동작 방지 (브라우저 텍스트 선택 차단)
+          if (canvas) {
+            const allObjects = canvas.getObjects();
+            if (allObjects.length > 0) {
+              canvas.discardActiveObject(); // 기존 선택 해제
+              const selection = new fabric.ActiveSelection(allObjects, {
+                canvas,
+              });
+              canvas.setActiveObject(selection);
+              canvas.requestRenderAll();
+            }
+          }
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   // 요소가 캔버스 영역  안에서만 이동되도록 제한
   useEffect(() => {
@@ -1050,7 +1076,7 @@ const CanvasDemo: React.FC = () => {
 
   return (
     <Wrapper>
-      <div>
+      <div style={{ marginTop: "50px" }}>
         <OrderWrapper>
           <OrderLeft>
             <ButtonGroup variant="contained" sx={{ marginRight: "6px" }}>
@@ -1099,6 +1125,7 @@ const CanvasDemo: React.FC = () => {
               >
                 <MenuItem value={70}>70%</MenuItem>
                 <MenuItem value={90}>90%</MenuItem>
+                <MenuItem value={100}>100%</MenuItem>
                 <MenuItem value={110}>110%</MenuItem>
                 <MenuItem value={130}>130%</MenuItem>
                 <MenuItem value={150}>150%</MenuItem>
@@ -1218,8 +1245,8 @@ const Wrapper = styled.div`
   display: flex;
   justify-content: center;
   align-items: center;
-  /*border: 2px solid green;*/
-  height: 90%;
+  /* border: 2px solid green; */
+  /* height: 90vh; */
 `;
 
 const OrderWrapper = styled.div`
