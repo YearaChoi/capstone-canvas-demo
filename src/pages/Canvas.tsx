@@ -1,15 +1,12 @@
 import React, { useRef, useEffect, useState, useCallback } from "react";
 import styled from "styled-components";
 import * as fabric from "fabric";
-import bgImg from "./assets/img/bgImg3.png";
+import bgImg from "../assets/img/bgImg3.png";
 import {
   Button,
   ButtonGroup,
-  FormControl,
-  InputLabel,
   MenuItem,
   Menu,
-  Select,
   SelectChangeEvent,
 } from "@mui/material";
 import SvgIcon from "@mui/material/SvgIcon";
@@ -18,7 +15,6 @@ import HorizontalRuleIcon from "@mui/icons-material/HorizontalRule";
 import ZoomOutMapIcon from "@mui/icons-material/ZoomOutMap";
 import UndoIcon from "@mui/icons-material/Undo";
 import RedoIcon from "@mui/icons-material/Redo";
-import ListIcon from "@mui/icons-material/List";
 import GridOnIcon from "@mui/icons-material/GridOn";
 import GridOffIcon from "@mui/icons-material/GridOff";
 import AlignHorizontalLeftIcon from "@mui/icons-material/AlignHorizontalLeft";
@@ -29,13 +25,13 @@ import AlignHorizontalCenterIcon from "@mui/icons-material/AlignHorizontalCenter
 import AlignVerticalCenterIcon from "@mui/icons-material/AlignVerticalCenter";
 import BorderHorizontalIcon from "@mui/icons-material/BorderHorizontal";
 import BorderVerticalIcon from "@mui/icons-material/BorderVertical";
-import GridDropdown from "./components/GridDropdown";
+import GridDropdown from "../components/GridDropdown";
 import { TEvent } from "fabric"; // IEvent 대신 TEvent 사용
 import ContentCopyIcon from "@mui/icons-material/ContentCopy"; // 복제 아이콘
 import DeleteOutlinedIcon from "@mui/icons-material/DeleteOutlineOutlined";
 import ArticleOutlinedIcon from "@mui/icons-material/ArticleOutlined";
-import SidePanel from "./components/SidePanel";
-import ZoomDropdown from "./components/ZoomDropdown";
+import SidePanel from "../components/SidePanel";
+import ZoomDropdown from "../components/ZoomDropdown";
 const CanvasDemo: React.FC = () => {
   const canvasRef = useRef<fabric.Canvas | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);

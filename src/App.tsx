@@ -1,6 +1,6 @@
 import React from "react";
-import CanvasDemo from "./CanvasDemo";
-import MenuAppBar from "./MenuAppBar";
+import CanvasDemo from "./pages/Canvas";
+import MenuAppBar from "./components/MenuAppBar";
 import styled from "styled-components";
 
 const App: React.FC = () => {
