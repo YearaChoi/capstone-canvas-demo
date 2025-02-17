@@ -43,6 +43,7 @@ import {
   distributeHorizontally,
   distributeVertically,
 } from "src/utils/alignmentUtils";
+import { useCanvasKeyboard } from "src/hooks/useCanvasKeyboard";
 
 const CanvasDemo: React.FC = () => {
   const canvasRef = useRef<fabric.Canvas | null>(null);
@@ -62,16 +63,11 @@ const CanvasDemo: React.FC = () => {
   } | null>(null);
   // context menu 상태 저장 부분
 
-  //// 묶어서 커스텀 훅으로 잘 만들기
   const [scale, setScale] = useState(1);
-  // const [canUndo, setCanUndo] = useState(false);
-  // const [canRedo, setCanRedo] = useState(false);
-  // const history = useRef<string[]>([]);
-  // const historyIndex = useRef<number>(-1);
-  const { canUndo, canRedo, saveState, undo, redo } = useCanvasHistory();
+  const { saveState, undo, redo } = useCanvasHistory();
+
   const [gridPixel, setGridPixel] = React.useState<number>(25); // 현재 그리드 간격 픽셀수
   const [sidePanel, setSidePanel] = useState(false); // 정보 사이드패널
-  ////
 
   const [isSnapping, setIsSnapping] = useState(true);
   const [zoomPercentage, setZoomPercentage] = useState(100);
@@ -167,6 +163,9 @@ const CanvasDemo: React.FC = () => {
       };
     }
   }, []);
+
+  // 키보드 단축키 사용
+  useCanvasKeyboard(canvasRef, undo, redo);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -268,54 +267,6 @@ const CanvasDemo: React.FC = () => {
       window.removeEventListener("keydown", handleKeyDown);
       window.removeEventListener("keyup", handleKeyUp);
     };
-  }, []);
-
-  // 키보드로 실행취소, 다시실행
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-
-      if (event.metaKey || event.ctrlKey) {
-        if (event.key === "z") {
-          event.preventDefault();
-          undo(canvas); // undo 실행
-        } else if (event.key === "y" || (event.shiftKey && event.key === "Z")) {
-          event.preventDefault();
-          redo(canvas); // redo 실행
-        }
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [undo, redo]);
-
-  // 캔버스 내 요소 전체 선택
-  useEffect(() => {
-    const canvas = canvasRef.current;
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.metaKey || event.ctrlKey) {
-        if (event.key === "a") {
-          event.preventDefault(); // 기본 Ctrl + A 동작 방지 (브라우저 텍스트 선택 차단)
-          if (canvas) {
-            const allObjects = canvas.getObjects();
-            if (allObjects.length > 0) {
-              canvas.discardActiveObject(); // 기존 선택 해제
-              const selection = new fabric.ActiveSelection(allObjects, {
-                canvas,
-              });
-              canvas.setActiveObject(selection);
-              canvas.requestRenderAll();
-            }
-          }
-        }
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
   // 요소가 캔버스 영역  안에서만 이동되도록 제한
@@ -571,9 +522,9 @@ const CanvasDemo: React.FC = () => {
     canvas.zoomToPoint(center, newScale);
   }, [zoomPercentage]);
 
-  const handleChangeZoom = (event: SelectChangeEvent<number>) => {
-    setZoomPercentage(event.target.value as number);
-  };
+  // const handleChangeZoom = (event: SelectChangeEvent<number>) => {
+  //   setZoomPercentage(event.target.value as number);
+  // };
 
   const getSelectionBounds = () => {
     const canvas = canvasRef.current;

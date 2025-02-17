@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback } from "react";
 import * as fabric from "fabric";
 
+// 기존의 캔버스 히스토리 관리 로직 (실행 취소, 다시 실행 등)
 export const useCanvasHistory = () => {
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
