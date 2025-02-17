@@ -32,6 +32,7 @@ import DeleteOutlinedIcon from "@mui/icons-material/DeleteOutlineOutlined";
 import ArticleOutlinedIcon from "@mui/icons-material/ArticleOutlined";
 import SidePanel from "../components/SidePanel";
 import ZoomDropdown from "../components/ZoomDropdown";
+import { useCanvasHistory } from "src/hooks/useCanvasHistory";
 import {
   alignBottom,
   alignCenter,
@@ -42,6 +43,7 @@ import {
   distributeHorizontally,
   distributeVertically,
 } from "src/utils/alignmentUtils";
+
 const CanvasDemo: React.FC = () => {
   const canvasRef = useRef<fabric.Canvas | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -62,10 +64,11 @@ const CanvasDemo: React.FC = () => {
 
   //// 묶어서 커스텀 훅으로 잘 만들기
   const [scale, setScale] = useState(1);
-  const [canUndo, setCanUndo] = useState(false);
-  const [canRedo, setCanRedo] = useState(false);
-  const history = useRef<string[]>([]);
-  const historyIndex = useRef<number>(-1);
+  // const [canUndo, setCanUndo] = useState(false);
+  // const [canRedo, setCanRedo] = useState(false);
+  // const history = useRef<string[]>([]);
+  // const historyIndex = useRef<number>(-1);
+  const { canUndo, canRedo, saveState, undo, redo } = useCanvasHistory();
   const [gridPixel, setGridPixel] = React.useState<number>(25); // 현재 그리드 간격 픽셀수
   const [sidePanel, setSidePanel] = useState(false); // 정보 사이드패널
   ////
@@ -77,6 +80,7 @@ const CanvasDemo: React.FC = () => {
     console.log("Parent gridPixel updated:", gridPixel);
     setGridPixel(gridPixel);
   }, [gridPixel]);
+
   useEffect(() => {
     if (!containerRef.current) return;
 
@@ -93,6 +97,7 @@ const CanvasDemo: React.FC = () => {
       );
     };
   }, []);
+
   useEffect(() => {
     if (containerRef.current) {
       const canvas = new fabric.Canvas("fabricCanvas", {
@@ -139,8 +144,8 @@ const CanvasDemo: React.FC = () => {
         // 최종 랜더링을 담당
         canvas.renderAll();
 
-        // 최종 상태 저장
-        saveState();
+        // 캔버스 최종 상태 저장
+        saveState(canvas);
       });
       canvasRef.current = canvas;
 
@@ -149,7 +154,7 @@ const CanvasDemo: React.FC = () => {
 
       // mouse:up 이벤트 리스너
       canvas.on("mouse:up", () => {
-        saveState();
+        saveState(canvas);
       });
 
       canvas.on("object:moving", (e) => {
@@ -265,88 +270,26 @@ const CanvasDemo: React.FC = () => {
     };
   }, []);
 
-  const saveState = () => {
-    const canvas = canvasRef.current;
-
-    if (!canvas) return;
-
-    // (Fabric.js의 toJSON 사용)
-    const currentState = JSON.stringify(canvas.toJSON());
-
-    if (historyIndex.current < history.current.length - 1) {
-      history.current = history.current.slice(0, historyIndex.current + 1);
-    }
-
-    // 상태가 변경된 경우에만 저장
-    if (history.current[history.current.length - 1] !== currentState) {
-      history.current.push(currentState);
-      historyIndex.current += 1;
-    }
-
-    setCanUndo(historyIndex.current > 0);
-    setCanRedo(false);
-  };
-
-  // useCallback을 사용하면 loadCanvasState가 항상 같은 함수 참조를 유지하므로 불필요한 재생성 방지
-  // useCallback은 인자로 전달한 콜백 함수 그 자체를 메모이제이션 하는 것
-  // 함수가 다시 필요할 때마다 함수를 새로 생성하는 것이 아닌 필요할 때마다 메모리에서 가져와서 재사용하는 것
-  const loadCanvasState = useCallback(
-    (canvas: fabric.Canvas, state: string) => {
-      if (!canvas) return;
-
-      canvas.loadFromJSON(state).then(() => {
-        canvas.renderAll(); // JSON 로드 후 즉시 렌더링
-        console.log("Json 로드 완료");
-        console.log("Json: ");
-      });
-    },
-    []
-  );
-
-  const undo = useCallback(() => {
-    const canvas = canvasRef.current;
-    if (!canvas || historyIndex.current <= 0) return;
-
-    historyIndex.current -= 1;
-    const state = history.current[historyIndex.current];
-
-    console.log("Undo 실행! ", state);
-    loadCanvasState(canvas, state);
-    setCanUndo(historyIndex.current > 0);
-    setCanRedo(true);
-  }, [loadCanvasState, setCanUndo, setCanRedo]);
-
-  // 렌더링이 되어도 함수 참조가 유지됨.
-  // useEffect가 불필요하게 다시 실행되는 것을 방지할 수 있음.
-  const redo = useCallback(() => {
-    const canvas = canvasRef.current;
-    if (!canvas || historyIndex.current >= history.current.length - 1) return;
-
-    historyIndex.current += 1;
-    const state = history.current[historyIndex.current];
-
-    console.log("Redo 실행!");
-    loadCanvasState(canvas, state);
-    setCanUndo(true);
-    setCanRedo(historyIndex.current < history.current.length - 1);
-  }, [loadCanvasState, setCanUndo, setCanRedo]); // 필요한 의존성 추가
-
+  // 키보드로 실행취소, 다시실행
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+
       if (event.metaKey || event.ctrlKey) {
         if (event.key === "z") {
           event.preventDefault();
-          undo();
+          undo(canvas); // undo 실행
         } else if (event.key === "y" || (event.shiftKey && event.key === "Z")) {
           event.preventDefault();
-          redo();
+          redo(canvas); // redo 실행
         }
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [undo, redo]); // undo, redo가 변경될 일이 없도록 useCallback 적용
+  }, [undo, redo]);
 
   // 캔버스 내 요소 전체 선택
   useEffect(() => {
@@ -492,11 +435,6 @@ const CanvasDemo: React.FC = () => {
       });
 
       canvas.setActiveObject(selection);
-
-      // // selection:created 이벤트를 적절히 발생시켜 UI 업데이트
-      // canvas.fire("selection:created", {
-      //   selected: activeObjects, // 선택된 객체들 배열을 전달
-      // });
     } else {
       // 하나만 선택한 경우 개별이동
       const obj = activeObjects[0];
@@ -821,10 +759,14 @@ const CanvasDemo: React.FC = () => {
               aria-label="Basic button group"
               sx={{ marginRight: "10px" }}
             >
-              <Button onClick={undo}>
+              <Button
+                onClick={() => canvasRef.current && undo(canvasRef.current)}
+              >
                 <SvgIcon component={UndoIcon} inheritViewBox />
               </Button>
-              <Button onClick={redo}>
+              <Button
+                onClick={() => canvasRef.current && redo(canvasRef.current)}
+              >
                 <SvgIcon component={RedoIcon} inheritViewBox />
               </Button>
             </ButtonGroup>
