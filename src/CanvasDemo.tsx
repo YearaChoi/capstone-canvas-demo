@@ -35,6 +35,7 @@ import ContentCopyIcon from "@mui/icons-material/ContentCopy"; // 복제 아이�
 import DeleteOutlinedIcon from "@mui/icons-material/DeleteOutlineOutlined";
 import ArticleOutlinedIcon from "@mui/icons-material/ArticleOutlined";
 import SidePanel from "./components/SidePanel";
+import ZoomDropdown from "./components/ZoomDropdown";
 const CanvasDemo: React.FC = () => {
   const canvasRef = useRef<fabric.Canvas | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -1090,47 +1091,10 @@ const CanvasDemo: React.FC = () => {
                 <ZoomOutMapIcon />
               </Button>
             </ButtonGroup>
-            <FormControl
-              sx={{
-                m: 1,
-                minWidth: 90,
-                height: 36,
-                margin: "none",
-              }}
-              size="small"
-            >
-              <InputLabel
-                id="demo-select-small-label"
-                sx={{ color: "primary.main" }}
-              >
-                zoom
-              </InputLabel>
-              <Select
-                labelId="demo-select-small-label"
-                id="demo-select-small"
-                value={zoomPercentage}
-                label="zoom"
-                onChange={handleChangeZoom}
-                renderValue={(value) => `${value}%`} // 현재 값을 %로 변환하여 표시
-                sx={{
-                  color: "primary.main",
-                  fontSize: 14,
-                  ".MuiOutlinedInput-notchedOutline": {
-                    borderColor: "#2196f3",
-                  },
-                  "&:hover .MuiOutlinedInput-notchedOutline": {
-                    borderColor: "primary.main",
-                  }, // 호버 시 색상 변경
-                }}
-              >
-                <MenuItem value={70}>70%</MenuItem>
-                <MenuItem value={90}>90%</MenuItem>
-                <MenuItem value={100}>100%</MenuItem>
-                <MenuItem value={110}>110%</MenuItem>
-                <MenuItem value={130}>130%</MenuItem>
-                <MenuItem value={150}>150%</MenuItem>
-              </Select>
-            </FormControl>
+            <ZoomDropdown
+              zoomPercentage={zoomPercentage}
+              setZoomPercentage={setZoomPercentage}
+            />
 
             <GridDropdown gridPixel={gridPixel} setGridPixel={setGridPixel} />
             <ButtonGroup
