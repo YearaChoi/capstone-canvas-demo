@@ -32,6 +32,16 @@ import DeleteOutlinedIcon from "@mui/icons-material/DeleteOutlineOutlined";
 import ArticleOutlinedIcon from "@mui/icons-material/ArticleOutlined";
 import SidePanel from "../components/SidePanel";
 import ZoomDropdown from "../components/ZoomDropdown";
+import {
+  alignBottom,
+  alignCenter,
+  alignLeft,
+  alignMiddle,
+  alignRight,
+  alignTop,
+  distributeHorizontally,
+  distributeVertically,
+} from "src/utils/alignmentUtils";
 const CanvasDemo: React.FC = () => {
   const canvasRef = useRef<fabric.Canvas | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -260,17 +270,6 @@ const CanvasDemo: React.FC = () => {
 
     if (!canvas) return;
 
-    // https://github.com/fabricjs/fabric.js/discussions/10176
-    // fabric.FabricObject.customProperties = [
-    //   "lockRotation",
-    //   "lockScalingFlip",
-    //   "lockScalingX",
-    //   "lockScalingY",
-    //   "hasControls",
-    //   "hoverCursor",
-    //   "moveCursor",
-    // ];
-
     // (Fabric.js의 toJSON 사용)
     const currentState = JSON.stringify(canvas.toJSON());
 
@@ -490,13 +489,6 @@ const CanvasDemo: React.FC = () => {
       canvas.discardActiveObject();
       const selection = new fabric.ActiveSelection(activeObjects, {
         canvas,
-        // lockRotation: false,
-        // lockScalingFlip: false,
-        // lockScalingX: false,
-        // lockScalingY: false,
-        // hasControls: false,
-        // hoverCursor: "grab",
-        // moveCursor: "grabbing",
       });
 
       canvas.setActiveObject(selection);
@@ -684,341 +676,60 @@ const CanvasDemo: React.FC = () => {
     initialSelectionBounds.current = null;
   };
 
-  const alignLeft = () => {
+  const handleAlignLeft = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const selectionBounds = getSelectionBounds();
-    if (!selectionBounds) return;
-
-    const { left } = selectionBounds;
-
-    const objects = canvas.getActiveObjects();
-    if (objects.length === 0) return;
-
-    // 객체들을 `top` 값 기준으로 그룹화
-    const groups: Record<string, fabric.Object[]> = {}; // key를 string으로 설정
-    const tolerance = 5; // 같은 줄로 인식할 `top` 차이 허용 범위
-
-    objects.forEach((obj) => {
-      const objTop = obj.top || 0;
-
-      // 기존 그룹 중, `top` 값이 비슷한 그룹 찾기
-      let groupKey = Object.keys(groups).find(
-        (key) => Math.abs(parseFloat(key) - objTop) <= tolerance
-      );
-
-      if (!groupKey) {
-        groupKey = objTop.toString(); // 새로운 그룹 생성
-        groups[groupKey] = [];
-      }
-
-      groups[groupKey]!.push(obj); // groupKey가 string임을 보장
-    });
-
-    // 각 그룹별로 타일형 정렬 수행
-    Object.values(groups).forEach((group) => {
-      group.sort((a, b) => (a.left || 0) - (b.left || 0));
-
-      let currentLeft = left;
-      group.forEach((obj) => {
-        obj.set({ left: currentLeft });
-        currentLeft += obj.width || 0; // 다음 객체를 오른쪽으로 배치
-      });
-    });
-
-    canvas.renderAll();
+    alignLeft(canvas, getSelectionBounds);
   };
 
-  const alignCenter = () => {
+  const handleAlignCenter = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const selectionBounds = getSelectionBounds();
-    if (!selectionBounds) return;
-
-    const { left, right } = selectionBounds;
-    const centerX = (left + right) / 2;
-
-    const objects = canvas.getActiveObjects();
-    if (objects.length === 0) return;
-
-    // 객체들을 `top` 값 기준으로 그룹화
-    const groups: Record<string, fabric.Object[]> = {};
-    const tolerance = 5;
-
-    objects.forEach((obj) => {
-      const objTop = obj.top || 0;
-      let groupKey = Object.keys(groups).find(
-        (key) => Math.abs(parseFloat(key) - objTop) <= tolerance
-      );
-
-      if (!groupKey) {
-        groupKey = objTop.toString();
-        groups[groupKey] = [];
-      }
-
-      groups[groupKey]!.push(obj);
-    });
-
-    // 각 그룹별로 타일형 정렬 수행
-    Object.values(groups).forEach((group) => {
-      group.sort((a, b) => (a.left || 0) - (b.left || 0));
-
-      let currentLeft =
-        centerX - group.reduce((sum, obj) => sum + (obj.width || 0), 0) / 2;
-      group.forEach((obj) => {
-        obj.set({ left: currentLeft });
-        currentLeft += obj.width || 0;
-      });
-    });
-
-    canvas.renderAll();
+    alignCenter(canvas, getSelectionBounds);
   };
 
-  const alignRight = () => {
+  const handleAlignRight = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const selectionBounds = getSelectionBounds();
-    if (!selectionBounds) return;
-
-    const { right } = selectionBounds;
-
-    const objects = canvas.getActiveObjects();
-    if (objects.length === 0) return;
-
-    // 객체들을 `top` 값 기준으로 그룹화
-    const groups: Record<string, fabric.Object[]> = {};
-    const tolerance = 5;
-
-    objects.forEach((obj) => {
-      const objTop = obj.top || 0;
-      let groupKey = Object.keys(groups).find(
-        (key) => Math.abs(parseFloat(key) - objTop) <= tolerance
-      );
-
-      if (!groupKey) {
-        groupKey = objTop.toString();
-        groups[groupKey] = [];
-      }
-
-      groups[groupKey]!.push(obj);
-    });
-
-    // 각 그룹별로 타일형 정렬 수행
-    Object.values(groups).forEach((group) => {
-      group.sort((a, b) => (a.left || 0) - (b.left || 0));
-
-      let currentRight = right;
-      group.reverse().forEach((obj) => {
-        obj.set({ left: currentRight - (obj.width || 0) });
-        currentRight -= obj.width || 0;
-      });
-    });
-
-    canvas.renderAll();
+    alignRight(canvas, getSelectionBounds);
   };
 
-  const alignTop = () => {
+  const handleAlignTop = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const selectionBounds = getSelectionBounds();
-    if (!selectionBounds) return;
-
-    const { top } = selectionBounds;
-
-    const objects = canvas.getActiveObjects();
-    if (objects.length === 0) return;
-
-    // 객체들을 left 값 기준으로 그룹화 (같은 열에 있는 객체끼리)
-    const groups: Record<string, fabric.Object[]> = {};
-    const tolerance = 5; // 같은 열로 인식할 left 차이 허용 범위
-
-    objects.forEach((obj) => {
-      const objLeft = obj.left || 0;
-      let groupKey = Object.keys(groups).find(
-        (key) => Math.abs(parseFloat(key) - objLeft) <= tolerance
-      );
-      if (!groupKey) {
-        groupKey = objLeft.toString();
-        groups[groupKey] = [];
-      }
-      groups[groupKey]!.push(obj);
-    });
-
-    // 각 그룹별로 타일형 정렬 (위에서 아래로)
-    Object.values(groups).forEach((group) => {
-      // top 값 기준 오름차순 정렬
-      group.sort((a, b) => (a.top || 0) - (b.top || 0));
-
-      let currentTop = top;
-      group.forEach((obj) => {
-        obj.set({ top: currentTop });
-        currentTop += obj.height || 0; // 다음 객체는 이전 객체 아래에 배치
-      });
-    });
-
-    canvas.renderAll();
+    alignTop(canvas, getSelectionBounds);
   };
 
-  const alignMiddle = () => {
+  const handleAlignMiddle = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const selectionBounds = getSelectionBounds();
-    if (!selectionBounds) return;
-
-    const { top, bottom } = selectionBounds;
-    const centerY = (top + bottom) / 2;
-
-    const objects = canvas.getActiveObjects();
-    if (objects.length === 0) return;
-
-    // left 좌표 기준으로 그룹화 (같은 열끼리)
-    const groups: Record<string, fabric.Object[]> = {};
-    const tolerance = 5;
-
-    objects.forEach((obj) => {
-      const objLeft = obj.left || 0;
-      let groupKey = Object.keys(groups).find(
-        (key) => Math.abs(parseFloat(key) - objLeft) <= tolerance
-      );
-      if (!groupKey) {
-        groupKey = objLeft.toString();
-        groups[groupKey] = [];
-      }
-      groups[groupKey]!.push(obj);
-    });
-
-    // 각 그룹별로 타일형 중앙 정렬 수행
-    Object.values(groups).forEach((group) => {
-      group.sort((a, b) => (a.top || 0) - (b.top || 0));
-
-      // 그룹 내 전체 높이 계산
-      const totalHeight = group.reduce(
-        (sum, obj) => sum + (obj.height || 0),
-        0
-      );
-      // 그룹을 중앙에 두기 위한 시작 top 값
-      let startY = centerY - totalHeight / 2;
-
-      group.forEach((obj) => {
-        obj.set({ top: startY });
-        startY += obj.height || 0;
-      });
-    });
-
-    canvas.renderAll();
+    alignMiddle(canvas, getSelectionBounds);
   };
 
-  const alignBottom = () => {
+  const handleAlignBottom = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const selectionBounds = getSelectionBounds();
-    if (!selectionBounds) return;
-
-    const { bottom } = selectionBounds;
-
-    const objects = canvas.getActiveObjects();
-    if (objects.length === 0) return;
-
-    // left 좌표 기준 그룹화
-    const groups: Record<string, fabric.Object[]> = {};
-    const tolerance = 5;
-
-    objects.forEach((obj) => {
-      const objLeft = obj.left || 0;
-      let groupKey = Object.keys(groups).find(
-        (key) => Math.abs(parseFloat(key) - objLeft) <= tolerance
-      );
-      if (!groupKey) {
-        groupKey = objLeft.toString();
-        groups[groupKey] = [];
-      }
-      groups[groupKey]!.push(obj);
-    });
-
-    // 각 그룹별로 타일형 하단 정렬 수행
-    Object.values(groups).forEach((group) => {
-      group.sort((a, b) => (a.top || 0) - (b.top || 0));
-
-      let currentBottom = bottom;
-      // 하단 정렬을 위해 그룹 내 객체 순서를 역순으로 처리
-      group.reverse().forEach((obj) => {
-        obj.set({ top: currentBottom - (obj.height || 0) });
-        currentBottom -= obj.height || 0;
-      });
-    });
-
-    canvas.renderAll();
+    alignBottom(canvas, getSelectionBounds);
   };
 
-  // top을 기준으로 그룹간 정렬 필요.
   // 세로 균등 배치
-  const distributeVertically = () => {
+  const handleDistributeVertically = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-
-    const selectionBounds = getSelectionBounds();
-    if (!selectionBounds) return;
-
-    const activeObjects = canvas.getActiveObjects();
-    if (activeObjects.length < 2) return; // 두 개 이상 선택해야 실행됨
-
-    const { top, bottom } = selectionBounds;
-    const totalHeight = bottom - top;
-    const numGaps = activeObjects.length - 1;
-    const totalObjectsHeight = activeObjects.reduce(
-      (sum, obj) => sum + obj.height!,
-      0
-    );
-    const gap = (totalHeight - totalObjectsHeight) / numGaps; // 균등 간격 계산
-
-    // 객체들을 top에서부터 균일한 간격으로 배치
-    let currentY = top;
-    activeObjects
-      .sort((a, b) => a.top! - b.top!) // 현재 위치 기준으로 정렬
-      .forEach((obj) => {
-        obj.set({ top: currentY });
-        currentY += obj.height! + gap; // 다음 객체의 위치 계산
-      });
-
-    canvas.renderAll();
+    distributeVertically(canvas, getSelectionBounds);
   };
 
   // 가로 균등 배치
-  const distributeHorizontally = () => {
+  const handleDistributeHorizontally = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-
-    const selectionBounds = getSelectionBounds();
-    if (!selectionBounds) return;
-
-    const activeObjects = canvas.getActiveObjects();
-    if (activeObjects.length < 2) return; // 두 개 이상 선택해야 실행됨
-
-    const { left, right } = selectionBounds;
-    const totalWidth = right - left;
-    const numGaps = activeObjects.length - 1;
-    const totalObjectsWidth = activeObjects.reduce(
-      (sum, obj) => sum + obj.width!,
-      0
-    );
-    const gap = (totalWidth - totalObjectsWidth) / numGaps; // 균등 간격 계산
-
-    // 객체들을 left에서부터 균일한 간격으로 배치
-    let currentX = left;
-    activeObjects
-      .sort((a, b) => a.left! - b.left!) // 현재 위치 기준으로 정렬
-      .forEach((obj) => {
-        obj.set({ left: currentX });
-        currentX += obj.width! + gap; // 다음 객체의 위치 계산
-      });
-
-    canvas.renderAll();
+    distributeHorizontally(canvas, getSelectionBounds);
   };
 
   // 요소 드래그되어 보이는 화면(뷰포트) 밖으로 나가면 뷰포트 이동
@@ -1118,33 +829,33 @@ const CanvasDemo: React.FC = () => {
               </Button>
             </ButtonGroup>
             <ButtonGroup variant="outlined" aria-label="Basic button group">
-              <Button onClick={distributeVertically}>
+              <Button onClick={handleDistributeVertically}>
                 <BorderVerticalIcon />
               </Button>
               <Button
-                onClick={distributeHorizontally}
+                onClick={handleDistributeHorizontally}
                 sx={{ marginRight: "10px" }}
               >
                 <BorderHorizontalIcon />
               </Button>
             </ButtonGroup>
             <ButtonGroup variant="outlined" aria-label="Basic button group">
-              <Button onClick={alignLeft}>
+              <Button onClick={handleAlignLeft}>
                 <AlignHorizontalLeftIcon />
               </Button>
-              <Button onClick={alignCenter}>
+              <Button onClick={handleAlignCenter}>
                 <AlignHorizontalCenterIcon />
               </Button>
-              <Button onClick={alignRight}>
+              <Button onClick={handleAlignRight}>
                 <AlignHorizontalRightIcon />
               </Button>
-              <Button onClick={alignTop}>
+              <Button onClick={handleAlignTop}>
                 <AlignVerticalTopIcon />
               </Button>
-              <Button onClick={alignMiddle}>
+              <Button onClick={handleAlignMiddle}>
                 <AlignVerticalCenterIcon />
               </Button>
-              <Button onClick={alignBottom}>
+              <Button onClick={handleAlignBottom}>
                 <AlignVerticalBottomIcon />
               </Button>
             </ButtonGroup>
