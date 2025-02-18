@@ -1,15 +1,12 @@
 import React, { useRef, useEffect, useState, useCallback } from "react";
 import styled from "styled-components";
 import * as fabric from "fabric";
-import bgImg from "./assets/img/bgImg3.png";
+import bgImg from "../assets/img/bgImg3.png";
 import {
   Button,
   ButtonGroup,
-  FormControl,
-  InputLabel,
   MenuItem,
   Menu,
-  Select,
   SelectChangeEvent,
 } from "@mui/material";
 import SvgIcon from "@mui/material/SvgIcon";
@@ -18,7 +15,6 @@ import HorizontalRuleIcon from "@mui/icons-material/HorizontalRule";
 import ZoomOutMapIcon from "@mui/icons-material/ZoomOutMap";
 import UndoIcon from "@mui/icons-material/Undo";
 import RedoIcon from "@mui/icons-material/Redo";
-import ListIcon from "@mui/icons-material/List";
 import GridOnIcon from "@mui/icons-material/GridOn";
 import GridOffIcon from "@mui/icons-material/GridOff";
 import AlignHorizontalLeftIcon from "@mui/icons-material/AlignHorizontalLeft";
@@ -29,13 +25,26 @@ import AlignHorizontalCenterIcon from "@mui/icons-material/AlignHorizontalCenter
 import AlignVerticalCenterIcon from "@mui/icons-material/AlignVerticalCenter";
 import BorderHorizontalIcon from "@mui/icons-material/BorderHorizontal";
 import BorderVerticalIcon from "@mui/icons-material/BorderVertical";
-import GridDropdown from "./components/GridDropdown";
+import GridDropdown from "../components/GridDropdown";
 import { TEvent } from "fabric"; // IEvent 대신 TEvent 사용
 import ContentCopyIcon from "@mui/icons-material/ContentCopy"; // 복제 아이콘
 import DeleteOutlinedIcon from "@mui/icons-material/DeleteOutlineOutlined";
 import ArticleOutlinedIcon from "@mui/icons-material/ArticleOutlined";
-import SidePanel from "./components/SidePanel";
-import ZoomDropdown from "./components/ZoomDropdown";
+import SidePanel from "../components/SidePanel";
+import ZoomDropdown from "../components/ZoomDropdown";
+import { useCanvasHistory } from "src/hooks/useCanvasHistory";
+import {
+  alignBottom,
+  alignCenter,
+  alignLeft,
+  alignMiddle,
+  alignRight,
+  alignTop,
+  distributeHorizontally,
+  distributeVertically,
+} from "src/utils/alignmentUtils";
+import { useCanvasShortcuts } from "src/hooks/useCanvasShortcuts";
+
 const CanvasDemo: React.FC = () => {
   const canvasRef = useRef<fabric.Canvas | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -54,15 +63,11 @@ const CanvasDemo: React.FC = () => {
   } | null>(null);
   // context menu 상태 저장 부분
 
-  //// 묶어서 커스텀 훅으로 잘 만들기
   const [scale, setScale] = useState(1);
-  const [canUndo, setCanUndo] = useState(false);
-  const [canRedo, setCanRedo] = useState(false);
-  const history = useRef<string[]>([]);
-  const historyIndex = useRef<number>(-1);
+  const { saveState, undo, redo } = useCanvasHistory();
+
   const [gridPixel, setGridPixel] = React.useState<number>(25); // 현재 그리드 간격 픽셀수
   const [sidePanel, setSidePanel] = useState(false); // 정보 사이드패널
-  ////
 
   const [isSnapping, setIsSnapping] = useState(true);
   const [zoomPercentage, setZoomPercentage] = useState(100);
@@ -71,6 +76,7 @@ const CanvasDemo: React.FC = () => {
     console.log("Parent gridPixel updated:", gridPixel);
     setGridPixel(gridPixel);
   }, [gridPixel]);
+
   useEffect(() => {
     if (!containerRef.current) return;
 
@@ -87,6 +93,7 @@ const CanvasDemo: React.FC = () => {
       );
     };
   }, []);
+
   useEffect(() => {
     if (containerRef.current) {
       const canvas = new fabric.Canvas("fabricCanvas", {
@@ -133,8 +140,8 @@ const CanvasDemo: React.FC = () => {
         // 최종 랜더링을 담당
         canvas.renderAll();
 
-        // 최종 상태 저장
-        saveState();
+        // 캔버스 최종 상태 저장
+        saveState(canvas);
       });
       canvasRef.current = canvas;
 
@@ -143,7 +150,7 @@ const CanvasDemo: React.FC = () => {
 
       // mouse:up 이벤트 리스너
       canvas.on("mouse:up", () => {
-        saveState();
+        saveState(canvas);
       });
 
       canvas.on("object:moving", (e) => {
@@ -156,6 +163,9 @@ const CanvasDemo: React.FC = () => {
       };
     }
   }, []);
+
+  // 키보드 단축키 사용
+  useCanvasShortcuts(canvasRef, undo, redo);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -257,127 +267,6 @@ const CanvasDemo: React.FC = () => {
       window.removeEventListener("keydown", handleKeyDown);
       window.removeEventListener("keyup", handleKeyUp);
     };
-  }, []);
-
-  const saveState = () => {
-    const canvas = canvasRef.current;
-
-    if (!canvas) return;
-
-    // https://github.com/fabricjs/fabric.js/discussions/10176
-    // fabric.FabricObject.customProperties = [
-    //   "lockRotation",
-    //   "lockScalingFlip",
-    //   "lockScalingX",
-    //   "lockScalingY",
-    //   "hasControls",
-    //   "hoverCursor",
-    //   "moveCursor",
-    // ];
-
-    // (Fabric.js의 toJSON 사용)
-    const currentState = JSON.stringify(canvas.toJSON());
-
-    if (historyIndex.current < history.current.length - 1) {
-      history.current = history.current.slice(0, historyIndex.current + 1);
-    }
-
-    // 상태가 변경된 경우에만 저장
-    if (history.current[history.current.length - 1] !== currentState) {
-      history.current.push(currentState);
-      historyIndex.current += 1;
-    }
-
-    setCanUndo(historyIndex.current > 0);
-    setCanRedo(false);
-  };
-
-  // useCallback을 사용하면 loadCanvasState가 항상 같은 함수 참조를 유지하므로 불필요한 재생성 방지
-  // useCallback은 인자로 전달한 콜백 함수 그 자체를 메모이제이션 하는 것
-  // 함수가 다시 필요할 때마다 함수를 새로 생성하는 것이 아닌 필요할 때마다 메모리에서 가져와서 재사용하는 것
-  const loadCanvasState = useCallback(
-    (canvas: fabric.Canvas, state: string) => {
-      if (!canvas) return;
-
-      canvas.loadFromJSON(state).then(() => {
-        canvas.renderAll(); // JSON 로드 후 즉시 렌더링
-        console.log("Json 로드 완료");
-        console.log("Json: ");
-      });
-    },
-    []
-  );
-
-  const undo = useCallback(() => {
-    const canvas = canvasRef.current;
-    if (!canvas || historyIndex.current <= 0) return;
-
-    historyIndex.current -= 1;
-    const state = history.current[historyIndex.current];
-
-    console.log("Undo 실행! ", state);
-    loadCanvasState(canvas, state);
-    setCanUndo(historyIndex.current > 0);
-    setCanRedo(true);
-  }, [loadCanvasState, setCanUndo, setCanRedo]);
-
-  // 렌더링이 되어도 함수 참조가 유지됨.
-  // useEffect가 불필요하게 다시 실행되는 것을 방지할 수 있음.
-  const redo = useCallback(() => {
-    const canvas = canvasRef.current;
-    if (!canvas || historyIndex.current >= history.current.length - 1) return;
-
-    historyIndex.current += 1;
-    const state = history.current[historyIndex.current];
-
-    console.log("Redo 실행!");
-    loadCanvasState(canvas, state);
-    setCanUndo(true);
-    setCanRedo(historyIndex.current < history.current.length - 1);
-  }, [loadCanvasState, setCanUndo, setCanRedo]); // 필요한 의존성 추가
-
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.metaKey || event.ctrlKey) {
-        if (event.key === "z") {
-          event.preventDefault();
-          undo();
-        } else if (event.key === "y" || (event.shiftKey && event.key === "Z")) {
-          event.preventDefault();
-          redo();
-        }
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [undo, redo]); // undo, redo가 변경될 일이 없도록 useCallback 적용
-
-  // 캔버스 내 요소 전체 선택
-  useEffect(() => {
-    const canvas = canvasRef.current;
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.metaKey || event.ctrlKey) {
-        if (event.key === "a") {
-          event.preventDefault(); // 기본 Ctrl + A 동작 방지 (브라우저 텍스트 선택 차단)
-          if (canvas) {
-            const allObjects = canvas.getObjects();
-            if (allObjects.length > 0) {
-              canvas.discardActiveObject(); // 기존 선택 해제
-              const selection = new fabric.ActiveSelection(allObjects, {
-                canvas,
-              });
-              canvas.setActiveObject(selection);
-              canvas.requestRenderAll();
-            }
-          }
-        }
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
   // 요소가 캔버스 영역  안에서만 이동되도록 제한
@@ -494,21 +383,9 @@ const CanvasDemo: React.FC = () => {
       canvas.discardActiveObject();
       const selection = new fabric.ActiveSelection(activeObjects, {
         canvas,
-        // lockRotation: false,
-        // lockScalingFlip: false,
-        // lockScalingX: false,
-        // lockScalingY: false,
-        // hasControls: false,
-        // hoverCursor: "grab",
-        // moveCursor: "grabbing",
       });
 
       canvas.setActiveObject(selection);
-
-      // // selection:created 이벤트를 적절히 발생시켜 UI 업데이트
-      // canvas.fire("selection:created", {
-      //   selected: activeObjects, // 선택된 객체들 배열을 전달
-      // });
     } else {
       // 하나만 선택한 경우 개별이동
       const obj = activeObjects[0];
@@ -645,9 +522,9 @@ const CanvasDemo: React.FC = () => {
     canvas.zoomToPoint(center, newScale);
   }, [zoomPercentage]);
 
-  const handleChangeZoom = (event: SelectChangeEvent<number>) => {
-    setZoomPercentage(event.target.value as number);
-  };
+  // const handleChangeZoom = (event: SelectChangeEvent<number>) => {
+  //   setZoomPercentage(event.target.value as number);
+  // };
 
   const getSelectionBounds = () => {
     const canvas = canvasRef.current;
@@ -688,341 +565,60 @@ const CanvasDemo: React.FC = () => {
     initialSelectionBounds.current = null;
   };
 
-  const alignLeft = () => {
+  const handleAlignLeft = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const selectionBounds = getSelectionBounds();
-    if (!selectionBounds) return;
-
-    const { left } = selectionBounds;
-
-    const objects = canvas.getActiveObjects();
-    if (objects.length === 0) return;
-
-    // 객체들을 `top` 값 기준으로 그룹화
-    const groups: Record<string, fabric.Object[]> = {}; // key를 string으로 설정
-    const tolerance = 5; // 같은 줄로 인식할 `top` 차이 허용 범위
-
-    objects.forEach((obj) => {
-      const objTop = obj.top || 0;
-
-      // 기존 그룹 중, `top` 값이 비슷한 그룹 찾기
-      let groupKey = Object.keys(groups).find(
-        (key) => Math.abs(parseFloat(key) - objTop) <= tolerance
-      );
-
-      if (!groupKey) {
-        groupKey = objTop.toString(); // 새로운 그룹 생성
-        groups[groupKey] = [];
-      }
-
-      groups[groupKey]!.push(obj); // groupKey가 string임을 보장
-    });
-
-    // 각 그룹별로 타일형 정렬 수행
-    Object.values(groups).forEach((group) => {
-      group.sort((a, b) => (a.left || 0) - (b.left || 0));
-
-      let currentLeft = left;
-      group.forEach((obj) => {
-        obj.set({ left: currentLeft });
-        currentLeft += obj.width || 0; // 다음 객체를 오른쪽으로 배치
-      });
-    });
-
-    canvas.renderAll();
+    alignLeft(canvas, getSelectionBounds);
   };
 
-  const alignCenter = () => {
+  const handleAlignCenter = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const selectionBounds = getSelectionBounds();
-    if (!selectionBounds) return;
-
-    const { left, right } = selectionBounds;
-    const centerX = (left + right) / 2;
-
-    const objects = canvas.getActiveObjects();
-    if (objects.length === 0) return;
-
-    // 객체들을 `top` 값 기준으로 그룹화
-    const groups: Record<string, fabric.Object[]> = {};
-    const tolerance = 5;
-
-    objects.forEach((obj) => {
-      const objTop = obj.top || 0;
-      let groupKey = Object.keys(groups).find(
-        (key) => Math.abs(parseFloat(key) - objTop) <= tolerance
-      );
-
-      if (!groupKey) {
-        groupKey = objTop.toString();
-        groups[groupKey] = [];
-      }
-
-      groups[groupKey]!.push(obj);
-    });
-
-    // 각 그룹별로 타일형 정렬 수행
-    Object.values(groups).forEach((group) => {
-      group.sort((a, b) => (a.left || 0) - (b.left || 0));
-
-      let currentLeft =
-        centerX - group.reduce((sum, obj) => sum + (obj.width || 0), 0) / 2;
-      group.forEach((obj) => {
-        obj.set({ left: currentLeft });
-        currentLeft += obj.width || 0;
-      });
-    });
-
-    canvas.renderAll();
+    alignCenter(canvas, getSelectionBounds);
   };
 
-  const alignRight = () => {
+  const handleAlignRight = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const selectionBounds = getSelectionBounds();
-    if (!selectionBounds) return;
-
-    const { right } = selectionBounds;
-
-    const objects = canvas.getActiveObjects();
-    if (objects.length === 0) return;
-
-    // 객체들을 `top` 값 기준으로 그룹화
-    const groups: Record<string, fabric.Object[]> = {};
-    const tolerance = 5;
-
-    objects.forEach((obj) => {
-      const objTop = obj.top || 0;
-      let groupKey = Object.keys(groups).find(
-        (key) => Math.abs(parseFloat(key) - objTop) <= tolerance
-      );
-
-      if (!groupKey) {
-        groupKey = objTop.toString();
-        groups[groupKey] = [];
-      }
-
-      groups[groupKey]!.push(obj);
-    });
-
-    // 각 그룹별로 타일형 정렬 수행
-    Object.values(groups).forEach((group) => {
-      group.sort((a, b) => (a.left || 0) - (b.left || 0));
-
-      let currentRight = right;
-      group.reverse().forEach((obj) => {
-        obj.set({ left: currentRight - (obj.width || 0) });
-        currentRight -= obj.width || 0;
-      });
-    });
-
-    canvas.renderAll();
+    alignRight(canvas, getSelectionBounds);
   };
 
-  const alignTop = () => {
+  const handleAlignTop = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const selectionBounds = getSelectionBounds();
-    if (!selectionBounds) return;
-
-    const { top } = selectionBounds;
-
-    const objects = canvas.getActiveObjects();
-    if (objects.length === 0) return;
-
-    // 객체들을 left 값 기준으로 그룹화 (같은 열에 있는 객체끼리)
-    const groups: Record<string, fabric.Object[]> = {};
-    const tolerance = 5; // 같은 열로 인식할 left 차이 허용 범위
-
-    objects.forEach((obj) => {
-      const objLeft = obj.left || 0;
-      let groupKey = Object.keys(groups).find(
-        (key) => Math.abs(parseFloat(key) - objLeft) <= tolerance
-      );
-      if (!groupKey) {
-        groupKey = objLeft.toString();
-        groups[groupKey] = [];
-      }
-      groups[groupKey]!.push(obj);
-    });
-
-    // 각 그룹별로 타일형 정렬 (위에서 아래로)
-    Object.values(groups).forEach((group) => {
-      // top 값 기준 오름차순 정렬
-      group.sort((a, b) => (a.top || 0) - (b.top || 0));
-
-      let currentTop = top;
-      group.forEach((obj) => {
-        obj.set({ top: currentTop });
-        currentTop += obj.height || 0; // 다음 객체는 이전 객체 아래에 배치
-      });
-    });
-
-    canvas.renderAll();
+    alignTop(canvas, getSelectionBounds);
   };
 
-  const alignMiddle = () => {
+  const handleAlignMiddle = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const selectionBounds = getSelectionBounds();
-    if (!selectionBounds) return;
-
-    const { top, bottom } = selectionBounds;
-    const centerY = (top + bottom) / 2;
-
-    const objects = canvas.getActiveObjects();
-    if (objects.length === 0) return;
-
-    // left 좌표 기준으로 그룹화 (같은 열끼리)
-    const groups: Record<string, fabric.Object[]> = {};
-    const tolerance = 5;
-
-    objects.forEach((obj) => {
-      const objLeft = obj.left || 0;
-      let groupKey = Object.keys(groups).find(
-        (key) => Math.abs(parseFloat(key) - objLeft) <= tolerance
-      );
-      if (!groupKey) {
-        groupKey = objLeft.toString();
-        groups[groupKey] = [];
-      }
-      groups[groupKey]!.push(obj);
-    });
-
-    // 각 그룹별로 타일형 중앙 정렬 수행
-    Object.values(groups).forEach((group) => {
-      group.sort((a, b) => (a.top || 0) - (b.top || 0));
-
-      // 그룹 내 전체 높이 계산
-      const totalHeight = group.reduce(
-        (sum, obj) => sum + (obj.height || 0),
-        0
-      );
-      // 그룹을 중앙에 두기 위한 시작 top 값
-      let startY = centerY - totalHeight / 2;
-
-      group.forEach((obj) => {
-        obj.set({ top: startY });
-        startY += obj.height || 0;
-      });
-    });
-
-    canvas.renderAll();
+    alignMiddle(canvas, getSelectionBounds);
   };
 
-  const alignBottom = () => {
+  const handleAlignBottom = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const selectionBounds = getSelectionBounds();
-    if (!selectionBounds) return;
-
-    const { bottom } = selectionBounds;
-
-    const objects = canvas.getActiveObjects();
-    if (objects.length === 0) return;
-
-    // left 좌표 기준 그룹화
-    const groups: Record<string, fabric.Object[]> = {};
-    const tolerance = 5;
-
-    objects.forEach((obj) => {
-      const objLeft = obj.left || 0;
-      let groupKey = Object.keys(groups).find(
-        (key) => Math.abs(parseFloat(key) - objLeft) <= tolerance
-      );
-      if (!groupKey) {
-        groupKey = objLeft.toString();
-        groups[groupKey] = [];
-      }
-      groups[groupKey]!.push(obj);
-    });
-
-    // 각 그룹별로 타일형 하단 정렬 수행
-    Object.values(groups).forEach((group) => {
-      group.sort((a, b) => (a.top || 0) - (b.top || 0));
-
-      let currentBottom = bottom;
-      // 하단 정렬을 위해 그룹 내 객체 순서를 역순으로 처리
-      group.reverse().forEach((obj) => {
-        obj.set({ top: currentBottom - (obj.height || 0) });
-        currentBottom -= obj.height || 0;
-      });
-    });
-
-    canvas.renderAll();
+    alignBottom(canvas, getSelectionBounds);
   };
 
-  // top을 기준으로 그룹간 정렬 필요.
   // 세로 균등 배치
-  const distributeVertically = () => {
+  const handleDistributeVertically = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-
-    const selectionBounds = getSelectionBounds();
-    if (!selectionBounds) return;
-
-    const activeObjects = canvas.getActiveObjects();
-    if (activeObjects.length < 2) return; // 두 개 이상 선택해야 실행됨
-
-    const { top, bottom } = selectionBounds;
-    const totalHeight = bottom - top;
-    const numGaps = activeObjects.length - 1;
-    const totalObjectsHeight = activeObjects.reduce(
-      (sum, obj) => sum + obj.height!,
-      0
-    );
-    const gap = (totalHeight - totalObjectsHeight) / numGaps; // 균등 간격 계산
-
-    // 객체들을 top에서부터 균일한 간격으로 배치
-    let currentY = top;
-    activeObjects
-      .sort((a, b) => a.top! - b.top!) // 현재 위치 기준으로 정렬
-      .forEach((obj) => {
-        obj.set({ top: currentY });
-        currentY += obj.height! + gap; // 다음 객체의 위치 계산
-      });
-
-    canvas.renderAll();
+    distributeVertically(canvas, getSelectionBounds);
   };
 
   // 가로 균등 배치
-  const distributeHorizontally = () => {
+  const handleDistributeHorizontally = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-
-    const selectionBounds = getSelectionBounds();
-    if (!selectionBounds) return;
-
-    const activeObjects = canvas.getActiveObjects();
-    if (activeObjects.length < 2) return; // 두 개 이상 선택해야 실행됨
-
-    const { left, right } = selectionBounds;
-    const totalWidth = right - left;
-    const numGaps = activeObjects.length - 1;
-    const totalObjectsWidth = activeObjects.reduce(
-      (sum, obj) => sum + obj.width!,
-      0
-    );
-    const gap = (totalWidth - totalObjectsWidth) / numGaps; // 균등 간격 계산
-
-    // 객체들을 left에서부터 균일한 간격으로 배치
-    let currentX = left;
-    activeObjects
-      .sort((a, b) => a.left! - b.left!) // 현재 위치 기준으로 정렬
-      .forEach((obj) => {
-        obj.set({ left: currentX });
-        currentX += obj.width! + gap; // 다음 객체의 위치 계산
-      });
-
-    canvas.renderAll();
+    distributeHorizontally(canvas, getSelectionBounds);
   };
 
   // 요소 드래그되어 보이는 화면(뷰포트) 밖으로 나가면 뷰포트 이동
@@ -1114,41 +710,45 @@ const CanvasDemo: React.FC = () => {
               aria-label="Basic button group"
               sx={{ marginRight: "10px" }}
             >
-              <Button onClick={undo}>
+              <Button
+                onClick={() => canvasRef.current && undo(canvasRef.current)}
+              >
                 <SvgIcon component={UndoIcon} inheritViewBox />
               </Button>
-              <Button onClick={redo}>
+              <Button
+                onClick={() => canvasRef.current && redo(canvasRef.current)}
+              >
                 <SvgIcon component={RedoIcon} inheritViewBox />
               </Button>
             </ButtonGroup>
             <ButtonGroup variant="outlined" aria-label="Basic button group">
-              <Button onClick={distributeVertically}>
+              <Button onClick={handleDistributeVertically}>
                 <BorderVerticalIcon />
               </Button>
               <Button
-                onClick={distributeHorizontally}
+                onClick={handleDistributeHorizontally}
                 sx={{ marginRight: "10px" }}
               >
                 <BorderHorizontalIcon />
               </Button>
             </ButtonGroup>
             <ButtonGroup variant="outlined" aria-label="Basic button group">
-              <Button onClick={alignLeft}>
+              <Button onClick={handleAlignLeft}>
                 <AlignHorizontalLeftIcon />
               </Button>
-              <Button onClick={alignCenter}>
+              <Button onClick={handleAlignCenter}>
                 <AlignHorizontalCenterIcon />
               </Button>
-              <Button onClick={alignRight}>
+              <Button onClick={handleAlignRight}>
                 <AlignHorizontalRightIcon />
               </Button>
-              <Button onClick={alignTop}>
+              <Button onClick={handleAlignTop}>
                 <AlignVerticalTopIcon />
               </Button>
-              <Button onClick={alignMiddle}>
+              <Button onClick={handleAlignMiddle}>
                 <AlignVerticalCenterIcon />
               </Button>
-              <Button onClick={alignBottom}>
+              <Button onClick={handleAlignBottom}>
                 <AlignVerticalBottomIcon />
               </Button>
             </ButtonGroup>
