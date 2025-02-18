@@ -2,7 +2,7 @@
 import { useEffect } from "react";
 import * as fabric from "fabric";
 
-export const useCanvasKeyboard = (
+export const useCanvasShortcuts = (
   canvasRef: React.RefObject<fabric.Canvas | null>,
   undo: (canvas: fabric.Canvas) => void,
   redo: (canvas: fabric.Canvas) => void

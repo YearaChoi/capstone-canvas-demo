@@ -43,7 +43,7 @@ import {
   distributeHorizontally,
   distributeVertically,
 } from "src/utils/alignmentUtils";
-import { useCanvasKeyboard } from "src/hooks/useCanvasKeyboard";
+import { useCanvasShortcuts } from "src/hooks/useCanvasShortcuts";
 
 const CanvasDemo: React.FC = () => {
   const canvasRef = useRef<fabric.Canvas | null>(null);
@@ -165,7 +165,7 @@ const CanvasDemo: React.FC = () => {
   }, []);
 
   // 키보드 단축키 사용
-  useCanvasKeyboard(canvasRef, undo, redo);
+  useCanvasShortcuts(canvasRef, undo, redo);
 
   useEffect(() => {
     const canvas = canvasRef.current;
